@@ -160,8 +160,8 @@ fn run_farm(
     test_spins: &Vec<u32>,
     test_spins_weights: &Vec<f64>,
     simulation_trials: u32,
-    graph_indexes: &[u32],
-    run_1000_batch: bool,
+    _graph_indexes: &[u32],
+    _run_1000_batch: bool,
     path_to_games: &str,
     min_mean_to_median: f64,
     max_mean_to_median: f64,
@@ -239,6 +239,12 @@ fn run_farm(
                     sorted_wins.push(win.0);
                 }
             }
+            if win_array.is_empty() {
+                println!("Warning: Empty win array for fence {}. Skipping pig generation.", fence.name);
+                pig_pens.push(Vec::new());
+                continue;
+            }
+            
             win_array.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let max_win = win_array[win_array.len() - 1];
             let min_win = win_array[0];
@@ -393,7 +399,7 @@ fn print_information(
         let mut non_win_fence_count: usize = 0;
         for fence in fences {
             if fence.win_type {
-                for (index, book_id_list) in &fence.win_dist {
+                for (_index, book_id_list) in &fence.win_dist {
                     for book_id in book_id_list {
                         lookup_table.entry(*book_id).and_modify(|value| {
                             value.weight = ((1.0 / fence.hr / (book_id_list.len() as f64))
@@ -594,9 +600,9 @@ fn recreate_show_pig(
             non_win_type_count += 1;
         }
     }
-    let mut rtp = 0.0;
+    let mut _rtp = 0.0;
     for index in 0..sorted_wins.len() {
-        rtp += sorted_wins[index] * weights[index]
+        _rtp += sorted_wins[index] * weights[index]
     }
     let success = run_enhanced_simulation(
         &sorted_wins,
@@ -621,9 +627,9 @@ fn create_show_pigs(
     process_id: u32,
     sorted_wins: &Array1<f64>,
     pig_pens: &Vec<Vec<Pig>>,
-    rtp: f64,
-    min_mean_to_median: f64,
-    max_mean_to_median: f64,
+    _rtp: f64,
+    _min_mean_to_median: f64,
+    _max_mean_to_median: f64,
     pmb_rtp: f64,
 ) -> Vec<ShowPig> {
     println!("Creating Initial Distributions");
@@ -659,8 +665,8 @@ fn create_show_pigs(
     }
 
     for p in 0..num_pigs {
-        let mut score = 0.0;
-        let mut pig_indexes: Vec<usize> = Vec::new();
+        let mut score;
+        let mut pig_indexes;
         for w_index in 0..weights.len() {
             weights[w_index] = 0.0;
         }
@@ -693,6 +699,12 @@ fn create_show_pigs(
                             [non_win_type_count]
                             .len()
                     ]);
+                }
+                if pig_pens[non_win_type_count].is_empty() {
+                    println!("Warning: Empty pig pen for fence {}. Skipping.", non_win_type_count);
+                    pig_indexes.push(0);
+                    non_win_type_count += 1;
+                    continue;
                 }
                 let pig_index = rng.gen_range(0..=pig_pens[non_win_type_count].len() - 1) as usize;
                 pig_indexes.push(pig_index);
@@ -784,7 +796,7 @@ fn sort_wins_by_parameter(
         let i_c = &mut fence.identity_condition;
 
         if i_c.search.is_empty() && i_c.win_range_start == -1.0 && i_c.opposite == false {
-            for (book_id, entry) in lookup_table {
+            for (_book_id, entry) in lookup_table {
                 fence
                     .win_dist
                     .entry(F64Wrapper(entry.win))
@@ -814,7 +826,7 @@ fn sort_wins_by_parameter(
                     condition_satisfied = !condition_satisfied;
                 }
                 if condition_satisfied {
-                    for book_id in &option.bookIds {
+                    for book_id in &option.book_ids {
                         if lookup_table.contains_key(book_id) {
                             let entry = lookup_table.get(book_id).unwrap();
                             fence
@@ -1571,7 +1583,7 @@ fn run_enhanced_simulation(
     pmb_rtp: f64,
 ) -> Vec<f64> {
     let num_spins = test_spins[test_spins.len() - 1usize] as usize;
-    let total_spin_trials = num_spins * trials;
+    let _total_spin_trials = num_spins * trials;
 
     let success: Vec<f64> = (0..num_spins)
         .into_par_iter()
