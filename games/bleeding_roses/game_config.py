@@ -4,12 +4,17 @@ Tunable design numbers live in this file:
 
 - `TIERS` — free-spin length and retrigger length per Reaper count.
 - `BLEED_MULT_WEIGHTS` — 2x / 3x / 5x reel-multiplier weights in the base game
-  and on the Full Bleed spin. Free-spin tiers do not stamp reel multipliers.
+  and on the Full Bleed spin.
+- `BLOOD_MOON_MULT_WEIGHTS` — the same ladder, drawn once when a Blood Moon
+  reel locks and kept for the rest of that bonus. Bleeding Spins and
+  Reaper's Harvest do not stamp reel multipliers.
 - `BUY_*_COST` and `FULL_BLEED_COST` — price of each paid mode. Set so the
-  optimized return is 96% of the price. Harvest is the most expensive buy.
-  Bleeding Spins is second when the board-wide bleed outpays sticky Blood Moon.
-- `SUPER_ANTE_VARIANTS` — both super-ante prices. Remove a tuple to drop that
-  mode from books, optimization, and the frontend config.
+  optimized return is 96% of the price. Average bonus wins, and therefore
+  buy prices, climb with the Reaper count: Bleeding Spins, then Blood Moon,
+  then Reaper's Harvest.
+- `SUPER_ANTE_VARIANTS` — published super-ante prices. Only the 20x ante is
+  published. Remove a tuple to drop that mode from books, optimization, and
+  the frontend config.
 
 The max win is 15000x the base bet on every mode. It is not multiplied by the
 mode cost. A 20x ante that caps still pays 15000x base (750x the debit).
@@ -19,7 +24,6 @@ serve both the 96% target and a real 15000x book:
 
 - base and bloodlust share BR0 / FRB / FRM / FRH. Bloodlust only differs by
   how often the optimizer deals a bonus.
-- super_ante_10 draws FRM10 and FRH10 (richer Moon and Harvest).
 - super_ante_20 draws FRM20 and FRH20.
 - each buy draws that tier's strip, and FRW when the book is a max win.
 - full_bleed draws FB0, or FBW for a max-win book.
@@ -64,21 +68,21 @@ TIERS = {
     },
 }
 
-# Remove a row to stop publishing that super-ante price.
-SUPER_ANTE_VARIANTS = (
-    ("super_ante_10", 10.0),
-    ("super_ante_20", 20.0),
-)
+# Only the 20x super ante is published.
+SUPER_ANTE_VARIANTS = (("super_ante_20", 20.0),)
 
 # Priced from the natural-EV probe so each buy returns ~96% of its cost.
-# Harvest is the most expensive. Bleeding Spins outpays sticky Blood Moon,
-# so it is the second buy. Full Bleed is one spin, priced the same way.
-BUY_MOON_COST = 39.0
+# Prices follow average bonus win: Bleeding Spins (~158x) < Blood Moon (~376x)
+# < Reaper's Harvest (~755x).
 BUY_BLEEDING_COST = 165.0
+BUY_MOON_COST = 385.0
 BUY_HARVEST_COST = 785.0
 FULL_BLEED_COST = 100.0
 
 BLEED_MULT_WEIGHTS = {2: 82, 3: 14, 5: 4}
+# Drawn once per sticky reel. Mostly 2x: the multiplier stays for every later
+# spin, so a hot ladder compounds past Reaper's Harvest.
+BLOOD_MOON_MULT_WEIGHTS = {2: 62, 3: 28, 5: 10}
 WINCAP_BLEED_WEIGHTS = {2: 5, 3: 15, 5: 80}
 
 
@@ -149,6 +153,7 @@ class GameConfig(Config):
         self.bleed_reels = [1, 2, 3]
         self.full_bleed_mode = "full_bleed"
         self.bleed_mult_weights = dict(BLEED_MULT_WEIGHTS)
+        self.blood_moon_mult_weights = dict(BLOOD_MOON_MULT_WEIGHTS)
         self.wincap_bleed_weights = dict(WINCAP_BLEED_WEIGHTS)
         self.rose_map = {"WR": "BWR", "RR": "BRR", "BR": "BBR"}
 
@@ -163,8 +168,6 @@ class GameConfig(Config):
             "FRB": "FRB.csv",
             "FRM": "FRM.csv",
             "FRH": "FRH.csv",
-            "FRM10": "FRM10.csv",
-            "FRH10": "FRH10.csv",
             "FRM20": "FRM20.csv",
             "FRH20": "FRH20.csv",
             "FRW": "FRW.csv",
@@ -187,11 +190,6 @@ class GameConfig(Config):
             "bleeding_spins": {"FRB": 1},
         }
         ante_tiers = {
-            "super_ante_10": {
-                "reapers_harvest": {"FRH10": 1},
-                "blood_moon": {"FRM10": 1},
-                "bleeding_spins": {"FRB": 1},
-            },
             "super_ante_20": {
                 "reapers_harvest": {"FRH20": 1},
                 "blood_moon": {"FRM20": 1},
@@ -221,7 +219,14 @@ class GameConfig(Config):
             self._mode(
                 "buy_blood_moon",
                 BUY_MOON_COST,
-                self._buy_distributions("blood_moon", 4, {"FRM": 1}, cap_reels, base_reels),
+                self._buy_distributions(
+                    "blood_moon",
+                    4,
+                    {"FRM": 1},
+                    cap_reels,
+                    base_reels,
+                    bleed_weights=self.blood_moon_mult_weights,
+                ),
                 buy=True,
             ),
             self._mode(
@@ -324,6 +329,7 @@ class GameConfig(Config):
         block = []
         for tier, quota in quotas:
             count, _info = self.tier_by_id(tier)
+            weights = self.blood_moon_mult_weights if tier == "blood_moon" else None
             block.append(
                 self._distribution(
                     tier,
@@ -332,6 +338,7 @@ class GameConfig(Config):
                     tier_reels[tier],
                     {count: 1},
                     force_free=True,
+                    bleed_weights=weights,
                 )
             )
         return block
@@ -361,11 +368,17 @@ class GameConfig(Config):
             self._distribution("basegame", 0.36, base_reels),
         ]
 
-    def _buy_distributions(self, criteria, scatter_count, free_reels, hot_reels, base_reels):
+    def _buy_distributions(self, criteria, scatter_count, free_reels, hot_reels, base_reels, bleed_weights=None):
         return [
             self._wincap_distribution(0.02, base_reels, hot_reels, scatter_count),
             self._distribution(
-                criteria, 0.98, base_reels, free_reels, {scatter_count: 1}, force_free=True
+                criteria,
+                0.98,
+                base_reels,
+                free_reels,
+                {scatter_count: 1},
+                force_free=True,
+                bleed_weights=bleed_weights,
             ),
         ]
 

@@ -23,33 +23,34 @@ Wincap_RTP = 0.01
 #
 # Cap is always 15000x the base bet. Its hit rate is 15000 / wincap_rtp / cost.
 FEATURE_TARGETS = {
+    # Hit rates are "1 in N". Each extra Reaper is 3.25x rarer than the tier
+    # below it. Average wins sit about 2-3% under the probed natural means
+    # (Bleeding ~158x, Blood Moon ~376x, Harvest ~755x) so the optimizer can
+    # overweight the smaller books in each fence.
     "base": {
-        "bleeding_spins": (615, 0.260),
-        "blood_moon": (720, 0.050),
-        "reapers_harvest": (3512, 0.205),
+        "bleeding_spins": (640, 0.24219),
+        "blood_moon": (2080, 0.17596),
+        "reapers_harvest": (6760, 0.10828),
         "basegame_hr": 4.72,
-        "basegame_rtp": 0.435,
+        "basegame_rtp": 0.42357,
     },
     "bloodlust": {
-        "bleeding_spins": (135, 0.39506),
-        "blood_moon": (150, 0.08000),
-        "reapers_harvest": (730, 0.32994),
+        "bleeding_spins": (139, 0.37170),
+        "blood_moon": (451, 0.27051),
+        "reapers_harvest": (1467, 0.16632),
         "basegame_hr": 4.72,
-        "basegame_rtp": 0.145,
+        "basegame_rtp": 0.14147,
     },
-    "super_ante_10": {
-        "bleeding_spins": (280, 0.05350),
-        "blood_moon": (40, 0.16250),
-        "reapers_harvest": (228, 0.69180),
-        "basegame_hr": 4.81,
-        "basegame_rtp": 0.04220,
-    },
+    # 20x ante: Blood Moon is the common trigger, Harvest is clearly rarer,
+    # and Bleeding Spins is the rarest. The top two tiers are ~92% of triggers.
+    # Moon and Harvest averages are the FRM20 / FRH20 probes (~829x and ~2612x),
+    # with the fence mean a few percent under those so the pigs can form.
     "super_ante_20": {
-        "bleeding_spins": (275, 0.02723),
-        "blood_moon": (45, 0.11667),
-        "reapers_harvest": (174, 0.77500),
+        "bleeding_spins": (732, 0.01045),
+        "blood_moon": (83, 0.48193),
+        "reapers_harvest": (293, 0.42662),
         "basegame_hr": 4.81,
-        "basegame_rtp": 0.02110,
+        "basegame_rtp": 0.02100,
         "wincap_rtp": 0.02,
     },
 }

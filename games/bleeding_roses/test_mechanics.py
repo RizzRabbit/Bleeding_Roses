@@ -64,7 +64,6 @@ def test_paytable_and_tiers():
     assert mode_names == [
         "base",
         "bloodlust",
-        "super_ante_10",
         "super_ante_20",
         "buy_bleeding",
         "buy_blood_moon",
@@ -74,9 +73,9 @@ def test_paytable_and_tiers():
     costs = {mode.get_name(): mode.get_cost() for mode in config.bet_modes}
     assert costs["base"] == 1
     assert costs["bloodlust"] == 3
-    assert costs["super_ante_10"] == 10
+    assert "super_ante_10" not in costs
     assert costs["super_ante_20"] == 20
-    assert costs["buy_harvest"] > costs["buy_bleeding"] > costs["buy_blood_moon"]
+    assert costs["buy_harvest"] > costs["buy_blood_moon"] > costs["buy_bleeding"]
     for mode in config.bet_modes:
         assert mode.get_wincap() == 15000, mode.get_name()
     for mode in config.bet_modes:
@@ -176,36 +175,54 @@ def test_bleeding_spins_bleed_the_whole_board():
 
 def test_blood_moon_sticky_persists():
     state = _state(criteria="blood_moon", freegame=True, tier="blood_moon")
+    state.get_current_distribution_conditions()["bleed_mult_weights"] = {3: 1}
     _plant(
         state,
         [
-            ["10", "10", "10", "10"],
-            ["BH", "WR", "10", "10"],
-            ["10", "10", "10", "10"],
-            ["10", "10", "10", "10"],
-            ["10", "10", "10", "10"],
+            ["A", "10", "J", "Q"],
+            ["BH", "WR", "K", "10"],
+            ["A", "K", "K", "K"],
+            ["K", "K", "K", "K"],
+            ["K", "K", "K", "K"],
         ],
     )
+    pay = state.config.paytable[(3, "A")]
     state.resolve_board()
     assert state.sticky_reels == [1]
+    assert state.sticky_multipliers == {1: 3}
+    assert state.reel_multipliers == [1, 3, 1, 1, 1]
     assert _names(state)[1][1] == "BWR"
-    assert any(event["type"] == "stickyReel" for event in state.book.events)
+    assert state.win_data["totalWin"] == quantize_win(pay * 3)
+    locked = [event for event in state.book.events if event["type"] == "stickyReel"]
+    assert locked[0]["newReels"] == [1]
+    assert locked[0]["multipliers"] == [3]
+    assert locked[0]["stickyMultipliers"] == [3]
+    bleed = [event for event in state.book.events if event["type"] == "reelBleed"]
+    assert bleed[0]["multiplier"] == 3
+    assert bleed[0]["scope"] == "reel"
 
     state.book = state.book.__class__(state.book.id, state.book.criteria)
     _plant(
         state,
         [
-            ["10", "10", "10", "10"],
-            ["RR", "10", "10", "10"],
-            ["BH", "WR", "10", "10"],
-            ["10", "10", "10", "10"],
-            ["10", "10", "10", "10"],
+            ["A", "10", "J", "Q"],
+            ["A", "RR", "K", "WR"],
+            ["BH", "K", "K", "K"],
+            ["K", "K", "K", "K"],
+            ["K", "K", "K", "K"],
         ],
     )
     state.resolve_board()
-    assert _names(state)[1][0] == "BRR"
-    assert _names(state)[2][1] == "BWR"
+    assert _names(state)[1][1] == "BRR"
+    assert _names(state)[1][3] == "BWR"
     assert state.sticky_reels == [1, 2]
+    assert state.sticky_multipliers == {1: 3, 2: 3}
+    assert state.reel_multipliers == [1, 3, 3, 1, 1]
+    assert state.win_data["totalWin"] == quantize_win(pay * 9)
+    locked = [event for event in state.book.events if event["type"] == "stickyReel"]
+    assert locked[0]["newReels"] == [2]
+    assert locked[0]["multipliers"] == [3]
+    assert locked[0]["stickyMultipliers"] == [3, 3]
 
 
 def test_harvest_global_multiplier_stacks_and_scales_the_win():
@@ -308,7 +325,6 @@ def test_wincap_is_reachable():
     modes = [
         "base",
         "bloodlust",
-        "super_ante_10",
         "super_ante_20",
         "buy_bleeding",
         "buy_blood_moon",

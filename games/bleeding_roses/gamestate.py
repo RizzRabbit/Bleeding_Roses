@@ -25,6 +25,7 @@ class GameState(GameStateOverride):
     def run_freespin(self):
         self.reset_fs_spin()
         self.sticky_reels = []
+        self.sticky_multipliers = {}
         if self.bonus_tier == "reapers_harvest":
             self.global_multiplier = 1
         while self.fs < self.tot_fs and not self.wincap_triggered:

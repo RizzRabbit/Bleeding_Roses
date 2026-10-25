@@ -6,11 +6,9 @@ they appear, sit at least five stops apart so a 4-row window never holds two.
 
     BR0     base spins (base, bloodlust, both antes, buy triggers)
     FRB     Bleeding Spins. Rose-heavy so the board-wide bleed pays well.
-    FRM     Blood Moon. Sticky reels, less violent than a board bleed.
+    FRM     Blood Moon. Richer than Bleeding Spins; sticky reel multipliers carry it.
     FRH     Reaper's Harvest. Leaner roses; the global multiplier carries it.
-    FRM10   Blood Moon on the 10x super ante
-    FRH10   Harvest on the 10x super ante
-    FRM20   Blood Moon on the 20x super ante
+    FRM20   Blood Moon on the 20x super ante. Richer than FRM, leaner than FRH20.
     FRH20   Harvest on the 20x super ante
     FRW     Max-win free spins. Already-bloody premiums, every tier can cap.
     FB0     Full Bleed feature spin
@@ -168,11 +166,9 @@ def main():
     strips = {
         "BR0.csv": base_strips(),
         "FRB.csv": _strip(401, wr=14, rr=11, br=8, bh=12, bwr=4, brr=3, bbr=2),
-        "FRM.csv": _strip(411, wr=12, rr=10, br=8, bh=14, bwr=3, brr=2, bbr=2),
+        "FRM.csv": _strip(411, wr=14, rr=10, br=8, bh=11, bwr=3, brr=2, bbr=2),
         "FRH.csv": _strip(421, wr=12, rr=9, br=7, bh=9, bwr=3, brr=2, bbr=2),
-        "FRM10.csv": _strip(431, wr=15, rr=12, br=10, bh=16, bwr=4, brr=3, bbr=2),
-        "FRH10.csv": _strip(441, wr=14, rr=11, br=8, bh=11, bwr=3, brr=2, bbr=2),
-        "FRM20.csv": _strip(451, wr=18, rr=14, br=12, bh=18, bwr=4, brr=3, bbr=3),
+        "FRM20.csv": _strip(451, wr=17, rr=13, br=10, bh=14, bwr=4, brr=3, bbr=2),
         "FRH20.csv": _strip(461, wr=16, rr=12, br=10, bh=12, bwr=4, brr=3, bbr=2),
         "FRW.csv": wincap_strips(),
         "FB0.csv": full_bleed_strips(),
@@ -181,7 +177,7 @@ def main():
     for name, columns in strips.items():
         _write(os.path.join(folder, name), columns)
         print(f"wrote {name}")
-    for stale in ("FR0.csv", "FRRICH.csv", "FRWCAP.csv", "FBWCAP.csv"):
+    for stale in ("FR0.csv", "FRRICH.csv", "FRWCAP.csv", "FBWCAP.csv", "FRM10.csv", "FRH10.csv"):
         path = os.path.join(folder, stale)
         if os.path.exists(path):
             os.remove(path)

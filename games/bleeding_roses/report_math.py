@@ -16,7 +16,6 @@ from game_config import GameConfig
 WINCAP_TIER = {
     "base": "reapers_harvest",
     "bloodlust": "reapers_harvest",
-    "super_ante_10": "reapers_harvest",
     "super_ante_20": "reapers_harvest",
     "buy_bleeding": "bleeding_spins",
     "buy_blood_moon": "blood_moon",
@@ -65,7 +64,8 @@ def summarise(config):
     print(
         "mode,cost,rtp,hit_rate,std_x,max_x,p_cap,"
         "hr_bleeding,hr_moon,hr_harvest,"
-        "rtp_base,rtp_bleeding,rtp_moon,rtp_harvest"
+        "rtp_base,rtp_bleeding,rtp_moon,rtp_harvest,"
+        "avg_bleeding,avg_moon,avg_harvest"
     )
     for mode in config.bet_modes:
         name = mode.get_name()
@@ -97,11 +97,17 @@ def summarise(config):
         def rtp(pay):
             return pay / total_w / cost
 
+        def avg(tier):
+            if tier_w[tier] <= 0:
+                return ""
+            return f"{tier_pay[tier] / tier_w[tier]:.2f}"
+
         print(
             f"{name},{cost:.0f},{mean / cost:.4f},{hit_w / total_w:.4f},{std:.2f},{max_win:.1f},"
             f"{cap_w / total_w:.8f},{hr('bleeding_spins')},{hr('blood_moon')},{hr('reapers_harvest')},"
             f"{rtp(base_pay):.4f},{rtp(tier_pay['bleeding_spins']):.4f},"
-            f"{rtp(tier_pay['blood_moon']):.4f},{rtp(tier_pay['reapers_harvest']):.4f}"
+            f"{rtp(tier_pay['blood_moon']):.4f},{rtp(tier_pay['reapers_harvest']):.4f},"
+            f"{avg('bleeding_spins')},{avg('blood_moon')},{avg('reapers_harvest')}"
         )
 
 

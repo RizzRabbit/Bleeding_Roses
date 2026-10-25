@@ -11,6 +11,7 @@ class GameStateOverride(GameExecutables):
         super().reset_book()
         self.bonus_tier = None
         self.sticky_reels = []
+        self.sticky_multipliers = {}
         self.reel_multipliers = [1] * self.config.num_reels
         self.pending_board_update = False
 

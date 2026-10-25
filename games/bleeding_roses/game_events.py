@@ -83,12 +83,14 @@ def sticky_bleed_event(gamestate, changes):
 
 
 def sticky_reel_event(gamestate, new_reels):
-    """A Blood Moon reel locks bloody for the rest of the bonus."""
+    """A Blood Moon reel locks bloody, with the multiplier it keeps for the bonus."""
     event = {
         "index": len(gamestate.book.events),
         "type": "stickyReel",
         "newReels": list(new_reels),
+        "multipliers": [gamestate.sticky_multipliers[reel] for reel in new_reels],
         "stickyReels": list(gamestate.sticky_reels),
+        "stickyMultipliers": [gamestate.sticky_multipliers[reel] for reel in gamestate.sticky_reels],
     }
     gamestate.book.add_event(event)
 

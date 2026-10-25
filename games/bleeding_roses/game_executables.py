@@ -24,6 +24,8 @@ class GameExecutables(GameCalculations):
         if feature == "full_bleed":
             self._apply_full_bleed()
         if feature == "blood_moon":
+            for reel, multiplier in self.sticky_multipliers.items():
+                self.reel_multipliers[reel] = multiplier
             self._apply_sticky_roses()
         self._apply_bleed(feature)
         if self.pending_board_update:
@@ -74,6 +76,22 @@ class GameExecutables(GameCalculations):
             transform_reels = list(heart_reels)
             scope = "reel"
 
+        if feature == "blood_moon":
+            # A reel locks the first time a heart lands on it. The 2x/3x/5x drawn
+            # then is the reel's multiplier for the rest of the bonus, including
+            # this spin. Later hearts on that reel do not reroll it.
+            newly_locked = []
+            for reel in heart_reels:
+                if reel in self.sticky_multipliers:
+                    continue
+                multiplier = self.draw_bleed_multiplier()
+                self.sticky_multipliers[reel] = multiplier
+                self.reel_multipliers[reel] = multiplier
+                self.sticky_reels.append(reel)
+                newly_locked.append(reel)
+            if newly_locked:
+                sticky_reel_event(self, newly_locked)
+
         changes_by_reel = {}
         for reel in transform_reels:
             changes_by_reel[reel] = self.transform_roses_on_reel(reel)
@@ -87,6 +105,8 @@ class GameExecutables(GameCalculations):
             if assign_multiplier and is_trigger:
                 multiplier = self.draw_bleed_multiplier()
                 self.reel_multipliers[reel] = multiplier
+            elif feature == "blood_moon" and is_trigger:
+                multiplier = self.sticky_multipliers[reel]
             reel_bleed_event(
                 self,
                 reel,
@@ -96,13 +116,6 @@ class GameExecutables(GameCalculations):
                 multiplier,
             )
             self.pending_board_update = True
-
-        if feature == "blood_moon":
-            new_reels = [reel for reel in heart_reels if reel not in self.sticky_reels]
-            for reel in new_reels:
-                self.sticky_reels.append(reel)
-            if new_reels:
-                sticky_reel_event(self, new_reels)
 
         if feature == "reapers_harvest":
             # One step per bleeding spin, not per heart. Per-heart steps pushed the
