@@ -8,10 +8,9 @@ Tunable design numbers live in this file:
 - `BLOOD_MOON_MULT_WEIGHTS` — the same ladder, drawn once when a Blood Moon
   reel locks and kept for the rest of that bonus. Bleeding Spins and
   Reaper's Harvest do not stamp reel multipliers.
-- `BUY_*_COST` and `FULL_BLEED_COST` — price of each paid mode. Set so the
-  optimized return is 96% of the price. Average bonus wins, and therefore
-  buy prices, climb with the Reaper count: Bleeding Spins, then Blood Moon,
-  then Reaper's Harvest.
+- `BUY_*_COST` and `FULL_BLEED_COST` — price of each paid mode, in base bets.
+  Buys are fixed at 100x / 300x / 600x. Full Bleed stays 100x. The free-spin
+  strips are tuned so each buy returns 96% of that price.
 - `SUPER_ANTE_VARIANTS` — published super-ante prices. Only the 20x ante is
   published. Remove a tuple to drop that mode from books, optimization, and
   the frontend config.
@@ -71,18 +70,17 @@ TIERS = {
 # Only the 20x super ante is published.
 SUPER_ANTE_VARIANTS = (("super_ante_20", 20.0),)
 
-# Priced from the natural-EV probe so each buy returns ~96% of its cost.
-# Prices follow average bonus win: Bleeding Spins (~158x) < Blood Moon (~376x)
-# < Reaper's Harvest (~755x).
-BUY_BLEEDING_COST = 165.0
-BUY_MOON_COST = 385.0
-BUY_HARVEST_COST = 785.0
+# Fixed prices, measured in base bets. At 96% RTP the buy pays about
+# 96x, 288x, and 576x. The free-spin strips are tuned to those means.
+BUY_BLEEDING_COST = 100.0
+BUY_MOON_COST = 300.0
+BUY_HARVEST_COST = 600.0
 FULL_BLEED_COST = 100.0
 
 BLEED_MULT_WEIGHTS = {2: 82, 3: 14, 5: 4}
-# Drawn once per sticky reel. Mostly 2x: the multiplier stays for every later
-# spin, so a hot ladder compounds past Reaper's Harvest.
-BLOOD_MOON_MULT_WEIGHTS = {2: 62, 3: 28, 5: 10}
+# Drawn once per sticky reel and kept for the bonus. Cool enough that a
+# 300x Blood Moon buy lands near 288x, above Bleeding Spins and under Harvest.
+BLOOD_MOON_MULT_WEIGHTS = {2: 70, 3: 23, 5: 7}
 WINCAP_BLEED_WEIGHTS = {2: 5, 3: 15, 5: 80}
 
 

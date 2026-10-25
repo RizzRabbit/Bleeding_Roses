@@ -165,11 +165,11 @@ def main():
     os.makedirs(folder, exist_ok=True)
     strips = {
         "BR0.csv": base_strips(),
-        "FRB.csv": _strip(401, wr=14, rr=11, br=8, bh=12, bwr=4, brr=3, bbr=2),
+        "FRB.csv": _strip(401, wr=12, rr=10, br=7, bh=12, bwr=4, brr=2, bbr=2),
         "FRM.csv": _strip(411, wr=14, rr=10, br=8, bh=11, bwr=3, brr=2, bbr=2),
-        "FRH.csv": _strip(421, wr=12, rr=9, br=7, bh=9, bwr=3, brr=2, bbr=2),
-        "FRM20.csv": _strip(451, wr=17, rr=13, br=10, bh=14, bwr=4, brr=3, bbr=2),
-        "FRH20.csv": _strip(461, wr=16, rr=12, br=10, bh=12, bwr=4, brr=3, bbr=2),
+        "FRH.csv": _strip(421, wr=12, rr=9, br=6, bh=9, bwr=3, brr=2, bbr=2),
+        "FRM20.csv": _strip(451, wr=14, rr=10, br=8, bh=11, bwr=3, brr=2, bbr=2),
+        "FRH20.csv": _strip(461, wr=12, rr=9, br=6, bh=9, bwr=3, brr=2, bbr=2),
         "FRW.csv": wincap_strips(),
         "FB0.csv": full_bleed_strips(),
         "FBW.csv": full_bleed_wincap_strips(),

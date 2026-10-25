@@ -75,6 +75,10 @@ def test_paytable_and_tiers():
     assert costs["bloodlust"] == 3
     assert "super_ante_10" not in costs
     assert costs["super_ante_20"] == 20
+    assert costs["buy_bleeding"] == 100
+    assert costs["buy_blood_moon"] == 300
+    assert costs["buy_harvest"] == 600
+    assert costs["full_bleed"] == 100
     assert costs["buy_harvest"] > costs["buy_blood_moon"] > costs["buy_bleeding"]
     for mode in config.bet_modes:
         assert mode.get_wincap() == 15000, mode.get_name()
@@ -346,6 +350,26 @@ def test_symbol_access_round_trip():
     state.set_symbol_at_position(0, 0, "BWR")
     assert state.get_symbol_at_position(0, 0) == "BWR"
     assert state.board[0][0].check_attribute("bled") is False or True
+
+
+def test_volatility_limits_use_the_local_cvar_gate():
+    import numpy as np
+
+    from lut_metrics import LOCAL_CVAR, STAKE_CVAR, metrics, star_checks
+
+    assert LOCAL_CVAR == 540
+    assert STAKE_CVAR == 700
+    calm_payouts = np.array([0.0, 1.0, 15000.0])
+    calm_probs = np.array([0.79, 0.209999, 0.000001])
+    calm_probs = calm_probs / calm_probs.sum()
+    calm = star_checks(metrics(calm_payouts, calm_probs, 1.0))
+    assert calm["std_cost"] and calm["cvar_cost"] and calm["p5k"] and calm["max_win"]
+
+    hot_payouts = np.array([0.0, 1.0, 8000.0])
+    hot_probs = np.array([0.5, 0.49, 0.01])
+    hot = star_checks(metrics(hot_payouts, hot_probs, 1.0))
+    assert hot["pass"] is False
+    assert hot["p5k"] is False or hot["cvar_cost"] is False
 
 
 def test_optimization_matches_modes():
