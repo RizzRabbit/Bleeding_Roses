@@ -1,58 +1,28 @@
 #!/usr/bin/env python3
-"""Debug test for bleeding roses game."""
+"""Run Bleeding Roses mechanic tests. Exits non-zero when any check fails."""
 
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+import sys
 
-from gamestate import GameState
-from game_config import GameConfig
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-def test_basic_game():
-    """Test basic game initialization and single spin."""
-    print("🌹 Testing Bleeding Roses Game Logic")
-    print("=" * 40)
-    
-    try:
-        # Initialize configuration
-        config = GameConfig()
-        print(f"✅ Config loaded: {config.game_id}")
-        print(f"   Symbols: {config.all_symbols}")
-        print(f"   Reels: {len(config.reels)}")
-        
-        # Initialize game state
-        gamestate = GameState(config)
-        print("✅ Game state initialized")
-        
-        # Initialize betmode (normally done in create_books)
-        gamestate.betmode = "base"
-        gamestate.gametype = "basegame"
-        print("✅ Betmode initialized")
-        
-        # Test distributions
-        print("\n🔍 Testing distributions...")
-        try:
-            conditions = gamestate.get_current_distribution_conditions()
-            print(f"✅ Distribution conditions: {type(conditions)}")
-        except Exception as e:
-            print(f"❌ Distribution error: {e}")
-        
-        # Test basic functionality without board drawing
-        print("\n🎰 Testing basic game calculations...")
-        
-        # Test game calculations directly
-        result = gamestate.evaluate_final_win()
-        print(f"✅ Game calculations work: {type(result)}")
-        print("✅ Single spin completed")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+import test_mechanics
+
 
 if __name__ == "__main__":
-    success = test_basic_game()
-    exit(0 if success else 1)
+    failures = 0
+    tests = [value for name, value in sorted(vars(test_mechanics).items()) if name.startswith("test_")]
+    for test in tests:
+        try:
+            test()
+            print(f"ok {test.__name__}")
+        except Exception as exc:
+            failures += 1
+            print(f"FAIL {test.__name__}: {exc}")
+            import traceback
+
+            traceback.print_exc()
+    if failures:
+        print(f"{failures} test(s) failed")
+        raise SystemExit(1)
+    print(f"{len(tests)} tests passed")

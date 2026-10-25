@@ -1,36 +1,117 @@
+"""Apply bleed rules, then score the board and emit win events."""
+
 from game_calculations import GameCalculations
+from game_events import (
+    board_after_bleed_event,
+    full_bleed_event,
+    global_multiplier_event,
+    reel_bleed_event,
+    sticky_bleed_event,
+    sticky_reel_event,
+)
 from src.calculations.ways import Ways
 
 
 class GameExecutables(GameCalculations):
-    """Events and calculations specific to Bleeding Roses ways wins with transformation."""
+    """One reveal's worth of Bleeding Roses actions."""
+
+    def resolve_board(self):
+        """Transform the revealed board, then evaluate ways on the result."""
+        self.reel_multipliers = [1] * self.config.num_reels
+        self.pending_board_update = False
+        feature = self._active_feature()
+
+        if feature == "full_bleed":
+            self._apply_full_bleed()
+        if feature == "blood_moon":
+            self._apply_sticky_roses()
+        self._apply_bleed(feature)
+        if self.pending_board_update:
+            board_after_bleed_event(self)
+        self.evaluate_ways_board()
 
     def evaluate_ways_board(self):
-        """
-        Populate win-data, record wins, transmit events for Bleeding Roses.
-        This integrates with the bleeding transformation mechanics.
-        """
-        # Get ways win data using the standard Ways calculation
-        self.win_data = Ways.get_ways_data(self.config, self.board)
-        
-        # Apply bleeding rose transformation logic from our game calculations
-        transformation_result = self.evaluate_final_win()
-        
-        # Update win data with transformation results if any
-        if transformation_result and transformation_result.get("transformation_occurred"):
-            # Recalculate ways after transformation
-            self.win_data = Ways.get_ways_data(self.config, self.board)
-            
-            # Add transformation events to win data
-            if "transformation_events" not in self.win_data:
-                self.win_data["transformation_events"] = []
-            self.win_data["transformation_events"].extend(transformation_result["transformation_events"])
-        
-        # Record wins if any exist
+        """Record ways wins against the post-bleed board and emit the standard win events."""
+        self.score_ways()
         if self.win_data["totalWin"] > 0:
             Ways.record_ways_wins(self)
             self.win_manager.update_spinwin(self.win_data["totalWin"])
-            
-        # Emit events including transformation events
         Ways.emit_wayswin_events(self)
-        self.emit_transformation_events()
+
+    def _active_feature(self):
+        if self.gametype == self.config.freegame_type and self.bonus_tier:
+            return self.bonus_tier
+        if self.betmode == self.config.full_bleed_mode:
+            return "full_bleed"
+        return "base"
+
+    def _apply_full_bleed(self):
+        changes = []
+        for reel in range(self.config.num_reels):
+            changes.extend(self.transform_roses_on_reel(reel))
+        if changes:
+            full_bleed_event(self, changes)
+            self.pending_board_update = True
+
+    def _apply_sticky_roses(self):
+        changes = []
+        for reel in self.sticky_reels:
+            changes.extend(self.transform_roses_on_reel(reel))
+        if changes:
+            sticky_bleed_event(self, changes)
+            self.pending_board_update = True
+
+    def _apply_bleed(self, feature):
+        heart_reels, rows_by_reel = self.bleeding_heart_reels()
+        if not heart_reels:
+            return
+
+        assign_multiplier = feature in ("base", "full_bleed")
+        if feature in ("bleeding_spins", "reapers_harvest"):
+            transform_reels = list(range(self.config.num_reels))
+            scope = "board"
+        else:
+            transform_reels = list(heart_reels)
+            scope = "reel"
+
+        changes_by_reel = {}
+        for reel in transform_reels:
+            changes_by_reel[reel] = self.transform_roses_on_reel(reel)
+
+        for reel in range(self.config.num_reels):
+            changes = changes_by_reel.get(reel, [])
+            is_trigger = reel in rows_by_reel
+            if not changes and not is_trigger:
+                continue
+            multiplier = None
+            if assign_multiplier and is_trigger:
+                multiplier = self.draw_bleed_multiplier()
+                self.reel_multipliers[reel] = multiplier
+            reel_bleed_event(
+                self,
+                reel,
+                scope,
+                rows_by_reel.get(reel, []),
+                changes,
+                multiplier,
+            )
+            self.pending_board_update = True
+
+        if feature == "blood_moon":
+            new_reels = [reel for reel in heart_reels if reel not in self.sticky_reels]
+            for reel in new_reels:
+                self.sticky_reels.append(reel)
+            if new_reels:
+                sticky_reel_event(self, new_reels)
+
+        if feature == "reapers_harvest":
+            # One step per bleeding spin, not per heart. Per-heart steps pushed the
+            # median Harvest onto the 15000x base cap; the cap stays a tail here,
+            # and the dedicated max-win reel is what guarantees a 15000x book.
+            self.global_multiplier += 1
+            global_multiplier_event(
+                self,
+                increment=1,
+                reel=heart_reels[0],
+                heart_reels=heart_reels,
+            )
