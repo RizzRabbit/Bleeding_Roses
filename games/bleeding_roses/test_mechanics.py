@@ -356,6 +356,20 @@ def test_freespin_end_and_win_without_mult_round():
     assert int(2.3 * 100) == 229
 
 
+def test_freespin_end_room_is_the_cap_minus_base_wins():
+    """The free-game total stops at wincap minus the base game, not at the full cap."""
+    from game_events import freespin_end_event
+
+    state = _state(criteria="wincap", freegame=True, tier="bleeding_spins")
+    state.win_manager.basegame_wins = 5
+    state.win_manager.freegame_wins = 16000
+    state.win_manager.running_bet_win = 16005
+    freespin_end_event(state)
+    event = state.book.events[-1]
+    assert event["type"] == "freeSpinEnd"
+    assert event["amount"] == 1_499_500
+
+
 def test_capped_bonus_keeps_base_wins_out_of_freespin_end():
     """A max win that also paid in the base game reports only the free portion."""
     state = _state(criteria="wincap", freegame=True, tier="bleeding_spins")
