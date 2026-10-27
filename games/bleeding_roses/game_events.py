@@ -4,6 +4,8 @@ Row indexes follow the Stake web-sdk convention: when the board is padded, row 0
 is the padding symbol above the window, so visible rows are reported as 1..4.
 """
 
+from copy import deepcopy
+
 from src.events.event_constants import EventConstants
 from src.events.events import json_ready_sym
 
@@ -141,6 +143,52 @@ def bonus_tier_event(gamestate):
         "boardBleed": info["board_bleed"],
         "sticky": info["sticky"],
         "globalMultiplier": info["global_mult"],
+    }
+    gamestate.book.add_event(event)
+
+
+def freespin_end_event(gamestate, winlevel_key="endFeature"):
+    """Freegame total. Rounded like finalWin so a 0.1x grid value is not 1 unit low.
+
+    The shared SDK event uses int(freegame_wins * 100), which truncates a float
+    that is a hair under the cent. This game does not edit that file.
+    """
+    amount = int(round(min(gamestate.win_manager.freegame_wins, gamestate.config.wincap) * 100))
+    event = {
+        "index": len(gamestate.book.events),
+        "type": EventConstants.FREE_SPIN_END.value,
+        "amount": amount,
+        "winLevel": gamestate.config.get_win_level(gamestate.win_manager.freegame_wins, winlevel_key),
+    }
+    gamestate.book.add_event(event)
+
+
+def win_info_event(gamestate, include_padding_index=True):
+    """Ways win payload. `winWithoutMult` is rounded onto book units, same as `win`.
+
+    The shared SDK event truncates that field with int(value * 100).
+    """
+    win_data_copy = {"wins": deepcopy(gamestate.win_data["wins"])}
+    for idx, win in enumerate(win_data_copy["wins"]):
+        if include_padding_index:
+            positions = [{"reel": pos["reel"], "row": pos["row"] + 1} for pos in win["positions"]]
+        else:
+            positions = win["positions"]
+        win_data_copy["wins"][idx]["win"] = int(
+            round(min(win_data_copy["wins"][idx]["win"], gamestate.config.wincap) * 100, 0)
+        )
+        win_data_copy["wins"][idx]["positions"] = positions
+        meta = win_data_copy["wins"][idx].get("meta")
+        if meta is not None and "winWithoutMult" in meta:
+            meta["winWithoutMult"] = int(round(min(meta["winWithoutMult"], gamestate.config.wincap) * 100))
+            if "overlay" in meta and include_padding_index:
+                meta["overlay"]["row"] += 1
+
+    event = {
+        "index": len(gamestate.book.events),
+        "type": EventConstants.WIN_DATA.value,
+        "totalWin": int(round(min(gamestate.win_data["totalWin"], gamestate.config.wincap) * 100, 0)),
+        "wins": win_data_copy["wins"],
     }
     gamestate.book.add_event(event)
 
