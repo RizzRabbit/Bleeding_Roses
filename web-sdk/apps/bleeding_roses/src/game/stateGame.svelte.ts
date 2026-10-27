@@ -11,6 +11,10 @@ export type Presentation = {
 	title: string;
 	subtitle: string;
 	amount: number | null;
+	/** Book units the amount eases from. Omit to ease from zero. */
+	fromAmount?: number;
+	/** Ease the win meter with the amount instead of leaving it on the final figure. */
+	driveMeter?: boolean;
 	winLevel: number;
 	duration: number;
 	resolve: () => void;

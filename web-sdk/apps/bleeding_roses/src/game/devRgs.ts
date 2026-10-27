@@ -34,6 +34,8 @@ const levels = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.6, 2, 3, 4, 5, 10, 20, 50, 100];
 
 const query = () => new URLSearchParams(window.location.search);
 
+const sessionCurrency = () => (query().get('currency') || 'USD').toUpperCase();
+
 const pick = (mode: string) => {
 	const forced = query().get('book');
 	if (forced) return books.find((book) => book.id === forced) ?? books[0];
@@ -54,8 +56,9 @@ export const installDevBooks = () => {
 				books = payload.books;
 			}
 			const start = query().get('mode') || 'base';
+			const social = query().get('social') === 'true';
 			return {
-				balance: { amount: toApi(balanceCents), currency: 'USD' },
+				balance: { amount: toApi(balanceCents), currency: sessionCurrency() },
 				config: {
 					gameID: 'bleeding_roses',
 					minBet: 200_000,
@@ -65,7 +68,7 @@ export const installDevBooks = () => {
 					betLevels: levels.map((level) => Math.round(level * 1_000_000)),
 					betModes: {},
 					jurisdiction: {
-						socialCasino: false,
+						socialCasino: social,
 						disabledFullscreen: false,
 						disabledTurbo: false,
 						disabledSuperTurbo: false,
@@ -99,7 +102,7 @@ export const installDevBooks = () => {
 			pendingCreditCents = credit;
 			if (credit === 0) pendingCreditCents = 0;
 			return {
-				balance: { amount: toApi(balanceCents), currency: options.currency || 'USD' },
+				balance: { amount: toApi(balanceCents), currency: sessionCurrency() },
 				round: {
 					betID: 1,
 					amount: Math.round(options.amount * 1_000_000),
@@ -116,7 +119,7 @@ export const installDevBooks = () => {
 		endRound: async () => {
 			balanceCents += pendingCreditCents;
 			pendingCreditCents = 0;
-			return { balance: { amount: toApi(balanceCents), currency: 'USD' } };
+			return { balance: { amount: toApi(balanceCents), currency: sessionCurrency() } };
 		},
 		endEvent: async (options) => ({ event: `${options.eventIndex}` }),
 	});

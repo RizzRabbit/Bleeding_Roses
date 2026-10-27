@@ -99,31 +99,29 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 	},
 	winInfo: async (bookEvent: BookEventOfType<'winInfo'>) => {
 		await flushMelts();
-		if (maxWinShown) {
-			// A winInfo after MAX WIN does not add another celebration. The meter stays on the cap.
-			stateBet.winBookEventAmount = CAP_AMOUNT;
-			return;
-		}
-		const lineOverCap = bookEvent.wins.some((win) => win.win > CAP_AMOUNT) || bookEvent.totalWin > CAP_AMOUNT;
-		const room = CAP_AMOUNT - stateBet.winBookEventAmount;
-		const crosses = bookEvent.totalWin > room;
+		if (maxWinShown) return;
 		const positions = bookEvent.wins.flatMap((win) => win.positions);
 		tone(520, 0.18, 'triangle', 0.03);
 		await glowWins(positions);
-		if (lineOverCap || crosses) stateBet.winBookEventAmount = CAP_AMOUNT;
 	},
 	setWin: async (bookEvent: BookEventOfType<'setWin'>) => {
 		if (maxWinShown) return;
 		const room = CAP_AMOUNT - stateBet.winBookEventAmount;
+		// The spin that reaches the cap is presented by the wincap event, not as its own win.
 		if (bookEvent.amount > room) return;
 		const amount = clampToCap(bookEvent.amount);
 		const level = winLevelMap[(bookEvent.winLevel as WinLevel) || 1];
 		await showWin(amount, bookEvent.winLevel, level?.text ?? 'WIN', 'win');
 	},
 	setTotalWin: async (bookEvent: BookEventOfType<'setTotalWin'>) => {
+		if (maxWinShown) return;
 		stateBet.winBookEventAmount = clampToCap(bookEvent.amount);
 	},
 	finalWin: async (bookEvent: BookEventOfType<'finalWin'>) => {
+		if (maxWinShown) {
+			stateBet.winBookEventAmount = CAP_AMOUNT;
+			return;
+		}
 		stateBet.winBookEventAmount = bookEvent.amount;
 	},
 	freeSpinTrigger: async (bookEvent: BookEventOfType<'freeSpinTrigger'>) => {
@@ -213,8 +211,22 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 	wincap: async (bookEvent: BookEventOfType<'wincap'>) => {
 		maxWinShown = true;
 		const amount = clampToCap(bookEvent.amount);
+		const from = Math.min(stateBet.winBookEventAmount, amount);
+		const duration = stateBet.isTurbo ? 900 : TEMPO.win.max;
+		const { preloadWinSheets, releaseWinSheets } = await import('./winSheets');
+		await preloadWinSheets();
+		await present({
+			kind: 'total',
+			title: t('MAX WIN'),
+			subtitle: t('15000x'),
+			amount,
+			fromAmount: from,
+			driveMeter: true,
+			winLevel: 10,
+			duration,
+		});
+		await releaseWinSheets();
 		stateBet.winBookEventAmount = amount;
-		await showWin(amount, 10, 'MAX WIN', 'total');
 	},
 	createBonusSnapshot: async (bookEvent: BookEventOfType<'createBonusSnapshot'>) => {
 		const find = <T extends BookEvent['type']>(type: T) =>

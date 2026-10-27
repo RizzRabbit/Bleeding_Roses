@@ -211,13 +211,19 @@
 			return;
 		}
 		const target = current.amount ?? 0;
+		const origin = current.fromAmount ?? 0;
 		const started = performance.now();
 		let frameId = 0;
 		const tick = (now: number) => {
-			const progress = Math.min(1, (now - started) / Math.max(1, current.duration));
-			shownAmount = target * (1 - (1 - progress) ** 2);
+			const progress = Math.min(1, Math.max(0, (now - started) / Math.max(1, current.duration)));
+			const eased = 1 - (1 - progress) ** 2;
+			shownAmount = Math.round(origin + (target - origin) * eased);
+			if (current.driveMeter) stateBet.winBookEventAmount = shownAmount;
 			if (progress < 1 && stateGame.presentation === current) frameId = requestAnimationFrame(tick);
-			else shownAmount = target;
+			else {
+				shownAmount = target;
+				if (current.driveMeter) stateBet.winBookEventAmount = Math.round(target);
+			}
 		};
 		frameId = requestAnimationFrame(tick);
 		const timer = window.setTimeout(() => {
