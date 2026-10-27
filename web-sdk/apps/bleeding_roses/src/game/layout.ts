@@ -36,7 +36,7 @@ export const stageFor = (layoutType: string): StagePlan => {
 				{ cx: 180, cy: 980, width: 220 },
 				{ cx: 420, cy: 980, width: 220 },
 			],
-			bar: { x: 80, y: 980, width: 0, height: 0 },
+			bar: { x: 40, y: 960, width: 1000, height: 112 },
 			tools: 'top-right',
 		};
 	}

@@ -2,8 +2,9 @@
 	import { bookEventAmountToCurrencyString, numberToCurrencyString } from 'utils-shared/amount';
 	import { stateBet, stateConfig, stateModal, stateSound, stateUrlDerived } from 'state-shared';
 
-	import { canAfford, debitAmount, modeCost, MODE_COST, setPersistent } from '../game/betModes';
+	import { canAfford, debitAmount, modeCost, setPersistent } from '../game/betModes';
 	import { DISCLAIMER, HOW_TO_PLAY, PAYTABLE, RULES } from '../game/config';
+	import { STILL_FILES } from '../game/constants';
 	import { getContext } from '../game/context';
 	import { stageFor } from '../game/layout';
 	import { armReplay } from '../game/replay';
@@ -24,8 +25,50 @@
 
 	let replayPlayed = $state(false);
 	let shownAmount = $state(0);
+	let mathModes = $state<{ name: string; cost: number; rtp: number; maxWin: number }[]>([]);
 
 	const money = (value: number) => numberToCurrencyString(value);
+
+	const FEATURES = [
+		{ mode: 'buy_bleeding', art: '12_bleeding_heart_wild.png', line: '10 free spins. The board bleeds.' },
+		{ mode: 'buy_blood_moon', art: '11_bloody_black_rose.png', line: '12 free spins. Reels lock bloody.' },
+		{ mode: 'buy_harvest', art: '13_reaper_scatter.png', line: '15 free spins. A global multiplier grows.' },
+		{ mode: 'full_bleed', art: '10_bloody_red_rose.png', line: 'One feature round. Every plain rose bleeds.' },
+	] as const;
+
+	const ANTES = [
+		{ mode: 'bloodlust', line: 'More Reapers. Each round costs 3x the base bet.' },
+		{ mode: 'super_ante_20', line: 'The highest feature rate. Each round costs 20x the base bet.' },
+	] as const;
+
+	const fitText = (node: HTMLElement, hint: number | string = 26) => {
+		let max = typeof hint === 'number' ? hint : 26;
+		const resize = () => {
+			const limit = node.clientWidth;
+			if (!limit) return;
+			let size = max;
+			node.style.fontSize = `${size}px`;
+			while (size > 9 && node.scrollWidth > limit + 1) {
+				size -= 1;
+				node.style.fontSize = `${size}px`;
+			}
+		};
+		const observer = new ResizeObserver(resize);
+		observer.observe(node);
+		resize();
+		return {
+			update(next: number | string) {
+				if (typeof next === 'number') max = next;
+				resize();
+			},
+			destroy() {
+				observer.disconnect();
+			},
+		};
+	};
+
+	const rtpText = (rtp: number) => `${(rtp <= 1 ? rtp * 100 : rtp).toFixed(2)}%`;
+	const costText = (cost: number) => (Number.isInteger(cost) ? `${cost}` : `${cost}`);
 
 	const betIndex = () => {
 		const levels = stateConfig.betAmountOptions;
@@ -133,7 +176,33 @@
 		return base;
 	};
 
-	const modes = Object.keys(MODE_COST);
+	const spinLabel = $derived(
+		replay ? (idle && replayPlayed ? t('Replay') : t('Play')) : !idle ? t('Skip') : t('Spin'),
+	);
+
+	const toolSide = (place: 'auto' | 'turbo') => {
+		if (stage.kind === 'portrait') {
+			const left = place === 'auto' ? 28 : 960;
+			return `left:${left}px;top:${stage.bar.y + 8}px`;
+		}
+		const left = stage.bar.x + stage.bar.width + (place === 'auto' ? 36 : 130);
+		return `left:${left}px;top:${stage.bar.y + 18}px`;
+	};
+
+	$effect(() => {
+		let cancelled = false;
+		fetch('/assets/math/index.json')
+			.then((response) => response.json())
+			.then((payload: { modes: typeof mathModes }) => {
+				if (!cancelled) mathModes = payload.modes ?? [];
+			})
+			.catch(() => {
+				if (!cancelled) mathModes = [];
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
 
 	$effect(() => {
 		const current = stateGame.presentation;
@@ -176,6 +245,7 @@
 
 <div
 	class="stage"
+	data-ui="hud"
 	style="left:{frame.x - (frame.width * frame.scale) / 2}px;top:{frame.y - (frame.height * frame.scale) / 2}px;width:{frame.width}px;height:{frame.height}px;transform:scale({frame.scale})"
 >
 	<img class="grain" src="/grain.png" alt="" />
@@ -185,93 +255,144 @@
 	{/if}
 
 	{#if !replay && !jurisdiction.disabledBuyFeature}
-		{#if social}
-			<button
-				class="text-plaque"
-				style="left:{stage.plaques[0].cx}px;top:{stage.plaques[0].cy}px;width:{stage.plaques[0].width}px"
-				onclick={() => (stateGame.panel = 'buy')}
-			>
-				{t('BONUS')}
-				<small>{t('3 BONUSES · FROM 100X')}</small>
-			</button>
-		{:else}
-			<button
-				class="plaque"
-				style="left:{stage.plaques[0].cx}px;top:{stage.plaques[0].cy}px;width:{stage.plaques[0].width}px"
-				onclick={() => (stateGame.panel = 'buy')}
-			>
+		<button
+			class="plaque"
+			data-open="buy"
+			style="left:{stage.plaques[0].cx}px;top:{stage.plaques[0].cy}px;width:{stage.plaques[0].width}px"
+			onclick={() => (stateGame.panel = 'buy')}
+		>
+			{#if social}
+				<span class="oval">{t('BONUS')}</span>
+			{:else}
 				<img src="/assets/scene/ui/plaque_bonus_buy.png" alt={t('Bonus Buy')} />
-				<small>{t('3 BONUSES · FROM 100X')}</small>
-			</button>
-		{/if}
+			{/if}
+			<small class="fit" use:fitText={12}>{t('4 FEATURES · FROM 100X')}</small>
+		</button>
 	{/if}
 
 	{#if !replay}
 		<button
 			class="plaque"
+			data-open="ante"
 			style="left:{stage.plaques[1].cx}px;top:{stage.plaques[1].cy}px;width:{stage.plaques[1].width}px"
 			onclick={() => (stateGame.panel = 'ante')}
 		>
 			<img src="/assets/scene/ui/plaque_ante.png" alt={t('Ante')} />
-			<small>{t('BLOODLUST 3X · SUPER 20X')}</small>
+			<small class="fit" use:fitText={12}>{t('BLOODLUST 3X · SUPER 20X')}</small>
 		</button>
 	{/if}
 
 	<div class="tools">
-		<button type="button" onclick={toggleSound}>{stateSound.volumeValueMaster > 0 ? t('Sound') : t('Muted')}</button>
-		<button type="button" onclick={() => (stateGame.panel = 'info')}>{t('Info')}</button>
-		<button type="button" onclick={() => (stateGame.panel = 'menu')}>{t('Menu')}</button>
+		<div class="tool">
+			<button class="iron-btn" class:on={stateSound.volumeValueMaster > 0} type="button" aria-label={t('Sound')} onclick={toggleSound}>
+				<svg viewBox="0 0 48 48" aria-hidden="true">
+					<path d="M10 18h8l10-8v28L18 30h-8z" />
+					{#if stateSound.volumeValueMaster > 0}
+						<path d="M34 16c4 3 4 13 0 16M38 12c7 5 7 19 0 24" fill="none" />
+					{:else}
+						<path d="M32 18l10 12M42 18L32 30" fill="none" />
+					{/if}
+				</svg>
+			</button>
+			<span class="fit" use:fitText={13}>{stateSound.volumeValueMaster > 0 ? t('Sound') : t('Muted')}</span>
+		</div>
+		<div class="tool">
+			<button class="iron-btn" type="button" aria-label={t('Info')} onclick={() => (stateGame.panel = 'info')}>
+				<svg viewBox="0 0 48 48" aria-hidden="true">
+					<circle cx="24" cy="24" r="12" fill="none" />
+					<path d="M24 22v10M24 16h.1" fill="none" />
+				</svg>
+			</button>
+			<span class="fit" use:fitText={13}>{t('Info')}</span>
+		</div>
+		<div class="tool">
+			<button class="iron-btn" type="button" aria-label={t('Menu')} data-open="menu" onclick={() => (stateGame.panel = 'menu')}>
+				<svg viewBox="0 0 48 48" aria-hidden="true">
+					<path d="M12 16h24M12 24h24M12 32h24" fill="none" />
+				</svg>
+			</button>
+			<span class="fit" use:fitText={13}>{t('Menu')}</span>
+		</div>
 	</div>
 
 	{#if !replay && !jurisdiction.disabledAutoplay}
-		<button
-			class="side"
-			style={stage.kind === 'portrait' ? 'left:24px;top:1760px' : 'left:1520px;top:940px'}
-			onclick={() => (stateBet.autoSpinsCounter > 0 ? (stateBet.autoSpinsCounter = 0) : (stateGame.panel = 'auto'))}
-		>
-			{stateBet.autoSpinsCounter > 0 ? t('Stop') : t('Autoplay')}
-		</button>
+		<div class="tool side" style={toolSide('auto')}>
+			<button
+				class="iron-btn"
+				class:on={stateBet.autoSpinsCounter > 0}
+				type="button"
+				aria-label={t('Autoplay')}
+				data-open="auto"
+				onclick={() => (stateBet.autoSpinsCounter > 0 ? (stateBet.autoSpinsCounter = 0) : (stateGame.panel = 'auto'))}
+			>
+				<svg viewBox="0 0 48 48" aria-hidden="true">
+					<path d="M16 24a8 8 0 1 0 2.4-5.7" fill="none" />
+					<path d="M16 14v6h6" fill="none" />
+				</svg>
+			</button>
+			<span class="fit" use:fitText={12}>{stateBet.autoSpinsCounter > 0 ? t('Stop') : t('Autoplay')}</span>
+		</div>
 	{/if}
 
 	{#if !jurisdiction.disabledTurbo}
-		<button
-			class="side"
-			style={stage.kind === 'portrait' ? 'left:900px;top:1760px' : 'left:1700px;top:940px'}
-			onclick={() => (stateBet.isTurbo = !stateBet.isTurbo)}
-		>
-			{stateBet.isTurbo ? t('Turbo on') : t('Turbo')}
-		</button>
+		<div class="tool side" style={toolSide('turbo')}>
+			<button
+				class="iron-btn"
+				class:on={stateBet.isTurbo}
+				type="button"
+				aria-label={t('Turbo')}
+				onclick={() => (stateBet.isTurbo = !stateBet.isTurbo)}
+			>
+				<svg viewBox="0 0 48 48" aria-hidden="true">
+					<path d="M26 8L14 26h8l-2 14 14-20h-8z" />
+				</svg>
+			</button>
+			<span class="fit" use:fitText={12}>{stateBet.isTurbo ? t('Turbo on') : t('Turbo')}</span>
+		</div>
 	{/if}
 
 	<div class="bar" style="left:{stage.bar.x}px;top:{stage.bar.y}px;width:{stage.bar.width}px;height:{stage.bar.height}px">
-		<div class="readout">
-			<span>{t('Balance')}</span>
-			<strong>{money(stateBet.balanceAmount)}</strong>
-		</div>
-		<button class="spin" type="button" onclick={spin}>
-			{#if replay}
-				{idle && replayPlayed ? t('Replay again') : t('Play')}
-			{:else if !idle}
-				{t('Skip')}
-			{:else}
-				{t('Spin')}
-			{/if}
-		</button>
-		<div class="readout">
-			<span>{t('Win')}</span>
-			<strong>{bookEventAmountToCurrencyString(stateBet.winBookEventAmount)}</strong>
-		</div>
-		<div class="bet">
-			{#if replay}
-				<em>{replayLabel()}</em>
-			{:else}
-				<button type="button" onclick={() => stepBet(-1)} aria-label={t('Decrease bet')}>−</button>
-				<em>{money(stateBet.betAmount)}</em>
-				<button type="button" onclick={() => stepBet(1)} aria-label={t('Increase bet')}>+</button>
-				{#if modeCost() > 1}
-					<small>{modeLabel(stateBet.activeBetModeKey)} {modeCost()}x · {money(debitAmount())}</small>
+		<div class="iron">
+			<div class="readout">
+				<span>{t('Balance')}</span>
+				<strong class="fit" use:fitText={money(stateBet.balanceAmount)}>{money(stateBet.balanceAmount)}</strong>
+			</div>
+			<div class="readout">
+				<span>{t('Win')}</span>
+				<strong class="fit" use:fitText={bookEventAmountToCurrencyString(stateBet.winBookEventAmount)}>
+					{bookEventAmountToCurrencyString(stateBet.winBookEventAmount)}
+				</strong>
+			</div>
+			<div class="spin-slot">
+				<button class="spin" type="button" data-spin onclick={spin}>
+					<svg viewBox="0 0 64 64" aria-hidden="true">
+						<g fill="#7a1824">
+							<ellipse cx="32" cy="16" rx="6" ry="10" />
+							<ellipse cx="32" cy="16" rx="6" ry="10" transform="rotate(72 32 32)" />
+							<ellipse cx="32" cy="16" rx="6" ry="10" transform="rotate(144 32 32)" />
+							<ellipse cx="32" cy="16" rx="6" ry="10" transform="rotate(216 32 32)" />
+							<ellipse cx="32" cy="16" rx="6" ry="10" transform="rotate(288 32 32)" />
+						</g>
+						<circle cx="32" cy="32" r="4.5" fill="#4a1018" />
+					</svg>
+					<span class="spin-label">{spinLabel}</span>
+				</button>
+			</div>
+			<div class="bet">
+				<span>{replay ? t('Play') : t('Bet')}</span>
+				{#if replay}
+					<em class="fit" use:fitText={replayLabel()}>{replayLabel()}</em>
+				{:else}
+					<div class="stepper">
+						<button class="iron-btn tiny" type="button" aria-label={t('Decrease bet')} onclick={() => stepBet(-1)}>−</button>
+						<em class="fit" use:fitText={money(stateBet.betAmount)}>{money(stateBet.betAmount)}</em>
+						<button class="iron-btn tiny" type="button" aria-label={t('Increase bet')} onclick={() => stepBet(1)}>+</button>
+					</div>
+					{#if modeCost() > 1}
+						<small class="fit" use:fitText={11}>{modeLabel(stateBet.activeBetModeKey)} {modeCost()}x · {money(debitAmount())}</small>
+					{/if}
 				{/if}
-			{/if}
+			</div>
 		</div>
 	</div>
 
@@ -287,19 +408,22 @@
 
 	{#if stateGame.panel === 'buy'}
 		<div class="shade">
-			<section>
+			<section class="gothic wide">
 				<h2>{t('Bonus Buy')}</h2>
-				{#each [
-					['buy_bleeding', '10 free spins. The board bleeds.'],
-					['buy_blood_moon', '12 free spins. Reels lock bloody.'],
-					['buy_harvest', "15 free spins. A global multiplier grows."],
-					['full_bleed', 'One feature round. Every plain rose bleeds.'],
-				] as row (row[0])}
-					<button type="button" onclick={() => chooseMode(row[0])}>
-						{modeLabel(row[0])}
-						<small>{row[1] ? t(row[1]) : ''} · {modeCost(row[0])}x · {money(stateBet.betAmount * modeCost(row[0]))}</small>
-					</button>
-				{/each}
+				<p class="lede">{t('4 features from 100x. The price is the bet times the cost.')}</p>
+				<div class="cards">
+					{#each FEATURES as card (card.mode)}
+						<article class="card">
+							<img src={`/assets/symbols/${card.art}`} alt="" />
+							<div>
+								<h3>{modeLabel(card.mode)}</h3>
+								<p>{t(card.line)}</p>
+								<p class="price">{modeCost(card.mode)}x · {money(stateBet.betAmount * modeCost(card.mode))}</p>
+							</div>
+							<button type="button" data-mode={card.mode} onclick={() => chooseMode(card.mode)}>{t('Buy')}</button>
+						</article>
+					{/each}
+				</div>
 				<button type="button" class="back" onclick={closePanel}>{t('Back')}</button>
 			</section>
 		</div>
@@ -307,10 +431,23 @@
 
 	{#if stateGame.panel === 'ante'}
 		<div class="shade">
-			<section>
+			<section class="gothic">
 				<h2>{t('Ante')}</h2>
-				<button type="button" onclick={() => chooseMode('bloodlust')}>{modeLabel('bloodlust')} · 3x</button>
-				<button type="button" onclick={() => chooseMode('super_ante_20')}>{modeLabel('super_ante_20')} · 20x</button>
+				<p class="lede">{t('An ante stays on until you return to the base game. Each one asks you to confirm the cost.')}</p>
+				<div class="cards ante-cards">
+					{#each ANTES as card (card.mode)}
+						<article class="card" class:on={stateBet.activeBetModeKey === card.mode}>
+							<div>
+								<h3>{modeLabel(card.mode)}</h3>
+								<p>{t(card.line)}</p>
+								<p class="price">{modeCost(card.mode)}x · {money(stateBet.betAmount * modeCost(card.mode))}</p>
+							</div>
+							<button type="button" data-mode={card.mode} onclick={() => chooseMode(card.mode)}>
+								{stateBet.activeBetModeKey === card.mode ? t('On') : t('Turn on')}
+							</button>
+						</article>
+					{/each}
+				</div>
 				<button type="button" onclick={() => { setPersistent('base'); stateGame.panel = null; }}>{t('Base')}</button>
 				<button type="button" class="back" onclick={closePanel}>{t('Back')}</button>
 			</section>
@@ -319,7 +456,7 @@
 
 	{#if stateGame.panel === 'auto'}
 		<div class="shade">
-			<section>
+			<section class="gothic">
 				<h2>{t('Autoplay')}</h2>
 				<p>{t('Confirm how many rounds to play.')}</p>
 				{#if !canAfford()}<p class="warn">{t('Insufficient funds')}</p>{/if}
@@ -335,7 +472,7 @@
 
 	{#if stateGame.panel === 'confirm' && stateGame.confirm}
 		<div class="shade">
-			<section>
+			<section class="gothic confirm">
 				<h2>{stateGame.confirm.title}</h2>
 				<p>{stateGame.confirm.body}</p>
 				{#if !canAfford(stateGame.confirm.mode)}
@@ -343,6 +480,7 @@
 				{/if}
 				<button
 					type="button"
+					data-confirm="yes"
 					disabled={!canAfford(stateGame.confirm.mode)}
 					onclick={() => stateGame.confirm?.resolve(true)}
 				>
@@ -355,7 +493,7 @@
 
 	{#if stateGame.panel === 'funds'}
 		<div class="shade">
-			<section>
+			<section class="gothic">
 				<h2>{t('Insufficient funds')}</h2>
 				<p>{t('The balance is lower than this bet.')}</p>
 				<button type="button" onclick={closePanel}>{t('Back')}</button>
@@ -365,7 +503,7 @@
 
 	{#if stateGame.panel === 'menu'}
 		<div class="shade">
-			<section>
+			<section class="gothic">
 				<h2>{t('Menu')}</h2>
 				<button type="button" onclick={() => (stateGame.panel = 'info')}>{t('Info')}</button>
 				<button type="button" onclick={toggleSound}>{stateSound.volumeValueMaster > 0 ? t('Sound') : t('Muted')}</button>
@@ -376,17 +514,25 @@
 
 	{#if stateGame.panel === 'info'}
 		<div class="shade">
-			<section class="rules">
+			<section class="gothic rules">
 				<div class="tabs">
-					<button type="button" onclick={() => (stateGame.infoTab = 'paytable')}>{t('Paytable')}</button>
-					<button type="button" onclick={() => (stateGame.infoTab = 'rules')}>{t('Rules')}</button>
-					<button type="button" onclick={() => (stateGame.infoTab = 'how')}>{t('How to play')}</button>
+					<button type="button" data-tab="paytable" class:on={stateGame.infoTab === 'paytable'} onclick={() => (stateGame.infoTab = 'paytable')}>{t('Paytable')}</button>
+					<button type="button" data-tab="rules" class:on={stateGame.infoTab === 'rules'} onclick={() => (stateGame.infoTab = 'rules')}>{t('Rules')}</button>
+					<button type="button" data-tab="how" class:on={stateGame.infoTab === 'how'} onclick={() => (stateGame.infoTab = 'how')}>{t('How to play')}</button>
 				</div>
 				{#if stateGame.infoTab === 'paytable'}
 					<h2>{t('Paytable')}</h2>
 					<p>{t('Wins are multiples of the base bet. The Bleeding Heart is wild. Bloody roses win 3x the plain rose.')}</p>
 					{#each PAYTABLE as row (row.symbol)}
-						<p>{t(row.label)} · 3 {row.three}x · 4 {row.four}x · 5 {row.five}x</p>
+						<div class="pay">
+							{#if STILL_FILES[row.symbol]}
+								<img src={`/assets/symbols/${STILL_FILES[row.symbol]}`} alt="" />
+							{/if}
+							<div>
+								<strong>{t(row.label)}</strong>
+								<span>3 {row.three}x · 4 {row.four}x · 5 {row.five}x</span>
+							</div>
+						</div>
 					{/each}
 					<p>{t('The Reaper does not form ways. It triggers the feature.')}</p>
 				{:else if stateGame.infoTab === 'how'}
@@ -401,8 +547,11 @@
 						<p>{t(rule.body)}</p>
 					{/each}
 					<h3>{t('Modes')}</h3>
-					{#each modes as mode (mode)}
-						<p>{modeLabel(mode)} · {modeCost(mode)}x · RTP 96.00% · {t('max win')} 15000x</p>
+					{#if !mathModes.length}
+						<p>{t('The mode list could not be read.')}</p>
+					{/if}
+					{#each mathModes as mode (mode.name)}
+						<p>{modeLabel(mode.name)} · {costText(mode.cost)}x · RTP {rtpText(mode.rtp)} · {t('max win')} {mode.maxWin}x</p>
 					{/each}
 					<h3>{t('How to play')}</h3>
 					{#each HOW_TO_PLAY as row (row.control)}
@@ -444,112 +593,227 @@
 	button {
 		font-family: inherit;
 		color: inherit;
-		background: rgba(12, 4, 8, 0.78);
-		border: 1px solid rgba(196, 165, 116, 0.4);
+		background: #14080c;
+		border: 1px solid rgba(196, 165, 116, 0.45);
 		cursor: pointer;
 	}
 	button:disabled {
 		opacity: 0.35;
 		cursor: default;
 	}
+	.fit {
+		display: block;
+		width: 100%;
+		overflow: hidden;
+		white-space: nowrap;
+		text-align: center;
+	}
 	.tools {
 		position: absolute;
-		top: 28px;
-		right: 28px;
+		top: 16px;
+		right: 22px;
 		display: flex;
-		gap: 8px;
+		gap: 14px;
 		pointer-events: none;
 	}
-	.tools button,
-	.side {
-		pointer-events: auto;
-		min-width: 92px;
-		min-height: 42px;
-		padding: 8px 12px;
-		font-size: 16px;
+	.tool {
+		width: 78px;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 6px;
+		pointer-events: none;
+	}
+	.tool .iron-btn {
+		margin: 0 auto;
+	}
+	.tool span {
+		font-size: 12px;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: #c4a574;
+		pointer-events: none;
 	}
 	.side {
 		position: absolute;
+		pointer-events: none;
 	}
-	.plaque,
-	.text-plaque {
+	.iron-btn {
+		pointer-events: auto;
+		width: 58px;
+		height: 58px;
+		border-radius: 50%;
+		padding: 0;
+		display: grid;
+		place-items: center;
+		background:
+			radial-gradient(circle at 50% 42%, #3a2428 0%, #14080c 72%);
+		border: 2px solid #6a4638;
+		box-shadow: inset 0 0 0 1px rgba(196, 165, 116, 0.28);
+	}
+	.iron-btn.on {
+		border-color: #c4a574;
+		background: radial-gradient(circle at 50% 42%, #4a1820 0%, #1a080c 72%);
+	}
+	.iron-btn svg {
+		width: 30px;
+		height: 30px;
+		stroke: #f4e7ea;
+		stroke-width: 2.4;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		fill: #f4e7ea;
+	}
+	.iron-btn.tiny {
+		width: 42px;
+		height: 42px;
+		font-size: 24px;
+		line-height: 1;
+		color: #f4e7ea;
+	}
+	.plaque {
 		position: absolute;
 		transform: translate(-50%, -50%);
 		background: transparent;
 		border: 0;
 		padding: 0;
+		width: 250px;
 	}
-	.plaque img {
+	.plaque img,
+	.oval {
 		width: 100%;
 		height: auto;
 		display: block;
 	}
-	.plaque small,
-	.text-plaque small {
-		display: block;
+	.oval {
+		min-height: 92px;
+		display: grid;
+		place-items: center;
+		border-radius: 999px;
+		border: 2px solid #6a4638;
+		background: radial-gradient(circle at 50% 40%, #3a1820, #12060c 70%);
+		font-family: 'Cinzel Decorative', Cinzel, serif;
+		letter-spacing: 0.14em;
+		font-size: 22px;
+	}
+	.plaque small {
 		margin-top: 6px;
-		font-size: 13px;
+		font-size: 12px;
 		letter-spacing: 0.08em;
 		color: #c4a574;
 	}
-	.text-plaque {
-		min-height: 92px;
-		background: rgba(12, 4, 8, 0.82);
-		border: 1px solid rgba(196, 165, 116, 0.5);
-		font-size: 28px;
-		letter-spacing: 0.16em;
-	}
 	.bar {
 		position: absolute;
-		display: grid;
-		grid-template-columns: 1fr auto 1fr;
-		grid-template-rows: 1fr auto;
-		align-items: center;
 		pointer-events: none;
 	}
+	.iron {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 28px;
+		height: 108px;
+		display: grid;
+		grid-template-columns: 1.15fr 0.9fr 126px 1.35fr;
+		gap: 10px;
+		align-items: center;
+		padding: 0 16px;
+		background: linear-gradient(180deg, #241418 0%, #10060a 100%);
+		border: 2px solid #5c3a32;
+		border-radius: 22px;
+		box-shadow: inset 0 0 0 1px rgba(196, 165, 116, 0.3), inset 0 0 0 7px rgba(62, 14, 20, 0.72);
+	}
+	.iron::before,
+	.iron::after {
+		content: '';
+		position: absolute;
+		top: 50%;
+		width: 16px;
+		height: 16px;
+		margin-top: -8px;
+		border-radius: 50%;
+		background: radial-gradient(circle at 40% 40%, #a12834, #4a0c14 72%);
+	}
+	.iron::before { left: -9px; }
+	.iron::after { right: -9px; }
 	.readout,
 	.bet {
-		pointer-events: none;
+		min-width: 0;
+		height: 74px;
+		padding: 8px 8px 6px;
 		text-align: center;
+		background: rgba(6, 2, 4, 0.62);
+		border: 1px solid rgba(196, 165, 116, 0.38);
+		border-radius: 12px;
 	}
 	.readout span,
+	.bet span,
 	.bet small {
 		display: block;
-		font-size: 14px;
-		letter-spacing: 0.14em;
+		font-size: 12px;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
 		color: #c4a574;
 	}
 	.readout strong,
 	.bet em {
 		font-style: normal;
-		font-size: 26px;
+		font-size: 24px;
+		font-weight: 500;
+		color: #f4e7ea;
 	}
 	.bet {
-		grid-column: 1 / -1;
-		display: flex;
-		gap: 12px;
-		align-items: center;
-		justify-content: center;
 		pointer-events: auto;
 	}
-	.bet button {
-		width: 42px;
-		height: 42px;
-		font-size: 24px;
+	.stepper {
+		display: grid;
+		grid-template-columns: 42px 1fr 42px;
+		gap: 6px;
+		align-items: center;
+	}
+	.spin-slot {
+		position: relative;
+		height: 100%;
+		pointer-events: none;
 	}
 	.spin {
-		width: 124px;
-		height: 124px;
+		pointer-events: auto;
+		position: absolute;
+		left: 50%;
+		top: -18px;
+		width: 126px;
+		height: 126px;
+		transform: translateX(-50%);
 		border-radius: 50%;
-		background: #6e1220;
+		border: 3px solid #c4a574;
+		background: radial-gradient(circle at 50% 42%, #7a1824 0%, #3a0a10 68%, #1a0608 100%);
+		box-shadow: inset 0 0 0 5px rgba(92, 16, 24, 0.85);
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: center;
+		gap: 0;
+		padding: 14px 18px 12px;
+	}
+	.spin svg {
+		width: 46px;
+		height: 40px;
+		margin: 0 auto;
+	}
+	.spin-label {
+		display: block;
+		width: auto;
+		margin-top: 1px;
 		font-family: 'Cinzel Decorative', Cinzel, serif;
-		font-size: 22px;
-		justify-self: center;
+		font-size: 11px;
+		line-height: 1;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		text-align: center;
 	}
 	.free {
 		position: absolute;
 		left: 50%;
-		top: 150px;
+		top: 148px;
 		transform: translateX(-50%);
 		letter-spacing: 0.16em;
 		font-size: 18px;
@@ -563,13 +827,18 @@
 		align-items: center;
 		justify-content: center;
 		gap: 12px;
-		background: rgba(7, 3, 8, 0.45);
+		background: rgba(7, 3, 8, 0.55);
 		border: 0;
 	}
 	.present strong {
 		font-family: 'Cinzel Decorative', Cinzel, serif;
 		font-size: 72px;
 		font-weight: 700;
+		letter-spacing: 0.14em;
+	}
+	.present span,
+	.present b {
+		font-family: Cinzel, serif;
 	}
 	.present b {
 		font-size: 42px;
@@ -581,52 +850,149 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: rgba(0, 0, 0, 0.62);
+		background: rgba(0, 0, 0, 0.68);
 	}
-	section {
-		width: min(760px, 86%);
-		max-height: 86%;
+	.gothic {
+		width: min(760px, 90%);
+		max-height: 88%;
 		overflow: auto;
-		padding: 28px;
-		background: #14060c;
-		border: 1px solid rgba(196, 165, 116, 0.4);
+		padding: 28px 26px;
+		background:
+			linear-gradient(180deg, rgba(90, 24, 32, 0.18), transparent 80px),
+			#12060c;
+		border: 1px solid rgba(196, 165, 116, 0.5);
+		box-shadow: inset 0 0 0 1px rgba(90, 16, 24, 0.8);
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 12px;
+	}
+	.gothic.wide {
+		width: min(980px, 94%);
 	}
 	h2,
 	h3 {
 		font-family: 'Cinzel Decorative', Cinzel, serif;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		color: #f4e7ea;
 		margin: 0;
 	}
-	section button small {
-		display: block;
-		margin-top: 4px;
-		color: #c4a574;
-		white-space: normal;
-		letter-spacing: 0.04em;
+	h2 {
+		font-size: 32px;
+		text-align: center;
+	}
+	h3 {
+		font-size: 20px;
 	}
 	p {
 		margin: 0;
-		line-height: 1.4;
+		line-height: 1.45;
 		font-size: 16px;
+		color: #f4e7ea;
+	}
+	.lede,
+	.legal {
+		color: #c4b8b0;
 	}
 	.legal {
 		font-size: 13px;
-		color: #c4b8b0;
 	}
 	.warn {
 		color: #e7b4b4;
 	}
-	.row {
-		display: flex;
-		gap: 8px;
+	.cards {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
 	}
+	.card {
+		display: grid;
+		grid-template-columns: 84px 1fr;
+		gap: 10px;
+		align-items: center;
+		padding: 12px;
+		background: rgba(8, 2, 6, 0.72);
+		border: 1px solid rgba(196, 165, 116, 0.32);
+	}
+	.card.on {
+		border-color: #9a3040;
+	}
+	.card img {
+		width: 84px;
+		height: 84px;
+		object-fit: contain;
+	}
+	.card h3 {
+		font-size: 18px;
+	}
+	.card p {
+		font-size: 14px;
+		color: #d9ccc4;
+	}
+	.price {
+		color: #c4a574 !important;
+		letter-spacing: 0.04em;
+	}
+	.card button,
+	.gothic > button {
+		min-height: 46px;
+		padding: 8px 12px;
+		font-size: 16px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.card button {
+		grid-column: 1 / -1;
+	}
+	.ante-cards .card {
+		grid-template-columns: 1fr;
+	}
+	.row,
 	.tabs {
 		display: flex;
 		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.tabs button,
+	.row button {
+		min-height: 44px;
+		min-width: 72px;
+		padding: 8px 12px;
+	}
+	.tabs button.on {
+		border-color: #c4a574;
+		color: #c4a574;
+	}
+	.pay {
+		display: grid;
+		grid-template-columns: 72px minmax(0, 1fr);
+		gap: 18px;
+		align-items: center;
+		padding: 8px 0;
+		border-bottom: 1px solid rgba(154, 48, 64, 0.35);
+	}
+	.pay img {
+		width: 64px;
+		height: 64px;
+		object-fit: contain;
+		justify-self: center;
+	}
+	.pay strong,
+	.pay span {
+		display: block;
+	}
+	.pay span {
+		color: #c4a574;
+		font-size: 14px;
 	}
 	.back {
-		margin-top: 8px;
+		margin-top: 4px;
+	}
+	.confirm {
+		width: min(560px, 88%);
+		text-align: center;
+	}
+	.confirm p {
+		font-size: 20px;
 	}
 </style>

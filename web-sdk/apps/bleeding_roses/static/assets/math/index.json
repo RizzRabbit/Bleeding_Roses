@@ -1,0 +1,60 @@
+{
+  "modes": [
+    {
+      "name": "base",
+      "cost": 1.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_base.jsonl.zst",
+      "weights": "lookUpTable_base_0.csv"
+    },
+    {
+      "name": "bloodlust",
+      "cost": 3.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_bloodlust.jsonl.zst",
+      "weights": "lookUpTable_bloodlust_0.csv"
+    },
+    {
+      "name": "super_ante_20",
+      "cost": 20.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_super_ante_20.jsonl.zst",
+      "weights": "lookUpTable_super_ante_20_0.csv"
+    },
+    {
+      "name": "buy_bleeding",
+      "cost": 100.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_buy_bleeding.jsonl.zst",
+      "weights": "lookUpTable_buy_bleeding_0.csv"
+    },
+    {
+      "name": "buy_blood_moon",
+      "cost": 300.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_buy_blood_moon.jsonl.zst",
+      "weights": "lookUpTable_buy_blood_moon_0.csv"
+    },
+    {
+      "name": "buy_harvest",
+      "cost": 600.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_buy_harvest.jsonl.zst",
+      "weights": "lookUpTable_buy_harvest_0.csv"
+    },
+    {
+      "name": "full_bleed",
+      "cost": 100.0,
+      "rtp": 0.96,
+      "maxWin": 15000.0,
+      "events": "books_full_bleed.jsonl.zst",
+      "weights": "lookUpTable_full_bleed_0.csv"
+    }
+  ]
+}

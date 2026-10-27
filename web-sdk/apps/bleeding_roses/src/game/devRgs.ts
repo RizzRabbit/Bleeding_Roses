@@ -11,8 +11,9 @@ type SampleBook = {
 	events: BookEvent[];
 };
 
+// base-wincap is lookup id 12 in lookUpTable_base.csv: mode base, simulation 11, criteria wincap, 15000x.
 const ORDER: Record<string, string[]> = {
-	base: ['base-win', 'base-best', 'base-bleeding', 'base-moon', 'base-harvest', 'base-zero', 'base-spin'],
+	base: ['base-win', 'base-best', 'base-bleeding', 'base-moon', 'base-harvest', 'base-zero', 'base-spin', 'base-wincap'],
 	bloodlust: ['bloodlust-spin', 'bloodlust-bleeding'],
 	super_ante_20: ['super-spin', 'super-harvest'],
 	buy_bleeding: ['buy-bleeding'],

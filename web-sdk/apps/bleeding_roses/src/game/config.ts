@@ -57,7 +57,7 @@ export const RULES: { title: string; body: string }[] = [
 	},
 	{
 		title: 'Ante, buys and Full Bleed',
-		body: 'Bloodlust is an ante of 3x the base bet. Super Ante is 20x. Bonus Buy: Bleeding Spins 100x, Blood Moon 300x, Reaper\'s Harvest 600x. Full Bleed is a feature spin at 100x that turns every plain rose bloody before the ways are scored. All prices are multiples of the base bet.',
+		body: 'Bloodlust is an ante of 3x the base bet. Super Ante is 20x. Bonus Buy opens 4 features from 100x: Bleeding Spins at 100x, Blood Moon at 300x, Reaper\'s Harvest at 600x, and Full Bleed at 100x. Full Bleed turns every plain rose bloody before the ways are scored. All prices are multiples of the base bet.',
 	},
 	{
 		title: 'Return and maximum win',
@@ -70,7 +70,7 @@ export const HOW_TO_PLAY: { control: string; text: string }[] = [
 	{ control: '+ / −', text: 'Steps the bet through the allowed levels. The ends stop there.' },
 	{ control: 'Autoplay', text: 'Opens a confirmation, then repeats the round for the chosen count.' },
 	{ control: 'Turbo', text: 'Speeds up the reels and the win presentation.' },
-	{ control: 'Bonus Buy', text: 'Opens Bleeding Spins, Blood Moon, Reaper\'s Harvest and Full Bleed.' },
+	{ control: 'Bonus Buy', text: 'Opens 4 features from 100x: Bleeding Spins, Blood Moon, Reaper\'s Harvest and Full Bleed.' },
 	{ control: 'Ante', text: 'Turns Bloodlust (3x) or Super Ante (20x) on for the following rounds. Each one asks you to confirm the cost.' },
 	{ control: 'Full Bleed', text: 'A single feature round at 100x the base bet. Every plain rose bleeds before the ways are scored.' },
 	{ control: 'Sound', text: 'Mutes or restores every tone, including feature rounds and big wins.' },

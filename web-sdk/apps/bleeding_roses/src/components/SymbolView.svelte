@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type * as PIXI from 'pixi.js';
-	import { AnimatedSprite, BaseSprite } from 'pixi-svelte';
+	import { AnimatedSprite, BaseSprite, Graphics } from 'pixi-svelte';
 
-	import { stillTexture, loadClip } from '../game/art.svelte';
+	import { IDLE_FRAME_STRIDE, loadClip, releaseIdle, retainIdle, stillTexture } from '../game/art.svelte';
 	import { BLOODY, CLIP_KEY } from '../game/constants';
 	import { completeCell } from '../game/stateGame.svelte';
 	import { animSpeed, TEMPO } from '../game/tempo';
@@ -49,7 +49,8 @@
 		const cap =
 			anim === 'melt' ? 4500 : anim === 'win' ? (name === 'BH' ? 5000 : TEMPO.win.rose) : 0;
 		if (cap) timer = window.setTimeout(finish, cap);
-		loadClip(key, mode).then((frames) => {
+		const framesPromise = mode === 'idle' ? retainIdle(key) : loadClip(key, mode);
+		framesPromise.then((frames) => {
 			if (cancelled) return;
 			if (!frames.length) {
 				if (cap) finish();
@@ -60,25 +61,27 @@
 		return () => {
 			cancelled = true;
 			window.clearTimeout(timer);
+			if (mode === 'idle') releaseIdle(key);
 		};
 	});
 
-	const scale = $derived(textures[0] ? 180 / textures[0].width : 180 / 1024);
 	const still = $derived(stillTexture(props.name));
 	const looping = $derived(
 		props.anim === 'idle' || (props.anim === 'win' && props.name !== 'BH' && BLOODY.has(props.name)),
 	);
+	const shownWidth = $derived(textures[0]?.width || still.width || 180);
+	const scale = $derived(180 / shownWidth);
+	const playSpeed = $derived(looping ? animSpeed() / IDLE_FRAME_STRIDE : animSpeed());
 </script>
 
 {#if props.glow}
-	<BaseSprite
-		texture={textures[0] ?? still}
+	<Graphics
 		x={props.x}
 		y={props.y}
-		anchor={{ x: 0.5, y: 0.5 }}
-		scale={scale * 1.08}
-		alpha={0.55}
-		tint={0xffc1d4}
+		draw={(graphics) => {
+			graphics.clear();
+			graphics.roundRect(-84, -84, 168, 168, 8).stroke({ width: 3, color: 0x9a3040, alpha: 0.9 });
+		}}
 	/>
 {/if}
 
@@ -89,7 +92,7 @@
 		y={props.y}
 		anchor={{ x: 0.5, y: 0.5 }}
 		{scale}
-		animationSpeed={animSpeed()}
+		animationSpeed={playSpeed}
 		loop={looping}
 		play={true}
 		onComplete={() => {
