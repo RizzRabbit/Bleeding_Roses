@@ -11,6 +11,7 @@
 	import { reelEngine } from '../game/reels.svelte';
 	import { isSocial, modeLabel, t } from '../game/social';
 	import { unlockSound } from '../game/sound';
+	import { CAP_AMOUNT } from '../game/bookEventHandlerMap';
 	import { askConfirm, dismissPresentation, stateGame } from '../game/stateGame.svelte';
 	import { skipHolds } from '../game/tempo';
 
@@ -37,8 +38,8 @@
 	] as const;
 
 	const ANTES = [
-		{ mode: 'bloodlust', line: 'More Reapers. Each round costs 3x the base bet.' },
-		{ mode: 'super_ante_20', line: 'The highest feature rate. Each round costs 20x the base bet.' },
+		{ mode: 'bloodlust', line: 'More free spins. Each round costs 3x the base bet.' },
+		{ mode: 'super_ante_20', line: 'Most free spins. Each round costs 20x the base bet.' },
 	] as const;
 
 	const fitText = (node: HTMLElement, hint: number | string = 26) => {
@@ -210,19 +211,20 @@
 			shownAmount = 0;
 			return;
 		}
-		const target = current.amount ?? 0;
-		const origin = current.fromAmount ?? 0;
+		const target = Math.min(current.amount ?? 0, CAP_AMOUNT);
+		const origin = Math.min(current.fromAmount ?? 0, target);
+		const exact = Math.round(target);
 		const started = performance.now();
 		let frameId = 0;
 		const tick = (now: number) => {
 			const progress = Math.min(1, Math.max(0, (now - started) / Math.max(1, current.duration)));
 			const eased = 1 - (1 - progress) ** 2;
-			shownAmount = Math.round(origin + (target - origin) * eased);
+			shownAmount = Math.min(CAP_AMOUNT, Math.round(origin + (target - origin) * eased));
 			if (current.driveMeter) stateBet.winBookEventAmount = shownAmount;
 			if (progress < 1 && stateGame.presentation === current) frameId = requestAnimationFrame(tick);
 			else {
-				shownAmount = target;
-				if (current.driveMeter) stateBet.winBookEventAmount = Math.round(target);
+				shownAmount = exact;
+				if (current.driveMeter) stateBet.winBookEventAmount = exact;
 			}
 		};
 		frameId = requestAnimationFrame(tick);
@@ -232,6 +234,8 @@
 		return () => {
 			cancelAnimationFrame(frameId);
 			window.clearTimeout(timer);
+			// Dismiss and skip both tear this effect down before the last frame lands.
+			if (current.driveMeter) stateBet.winBookEventAmount = exact;
 		};
 	});
 

@@ -13,7 +13,7 @@ import { winLevelMap, type WinLevel } from './winLevelMap';
 const pending: Promise<void>[] = [];
 
 /** Book units for 15000x. A round stops presenting once this cap is on screen. */
-const CAP_AMOUNT = 1_500_000;
+export const CAP_AMOUNT = 1_500_000;
 let maxWinShown = false;
 
 export const beginRound = () => {
@@ -34,16 +34,17 @@ const flushMelts = async () => {
 };
 
 const showWin = async (amount: number, winLevel: number, title: string, kind: 'win' | 'total') => {
+	const capped = clampToCap(amount);
 	const level = winLevelMap[(winLevel as WinLevel) || 1] ?? winLevelMap[2];
-	if (!amount && kind === 'win') return;
-	if (level.type === 'max' || winLevel >= 10 || amount >= 1_500_000) {
+	if (!capped && kind === 'win') return;
+	if (level.type === 'max' || winLevel >= 10 || capped >= CAP_AMOUNT) {
 		const { preloadWinSheets, releaseWinSheets } = await import('./winSheets');
 		await preloadWinSheets();
 		await present({
 			kind,
 			title: t('MAX WIN'),
 			subtitle: t('15000x'),
-			amount,
+			amount: CAP_AMOUNT,
 			winLevel: 10,
 			duration: stateBet.isTurbo ? 900 : TEMPO.win.max,
 		});
@@ -58,7 +59,7 @@ const showWin = async (amount: number, winLevel: number, title: string, kind: 'w
 		kind,
 		title: t(title || level.text || 'WIN'),
 		subtitle: '',
-		amount,
+		amount: capped,
 		winLevel,
 		duration: stateBet.isTurbo ? Math.min(700, duration) : duration,
 	});
@@ -118,11 +119,7 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 		stateBet.winBookEventAmount = clampToCap(bookEvent.amount);
 	},
 	finalWin: async (bookEvent: BookEventOfType<'finalWin'>) => {
-		if (maxWinShown) {
-			stateBet.winBookEventAmount = CAP_AMOUNT;
-			return;
-		}
-		stateBet.winBookEventAmount = bookEvent.amount;
+		stateBet.winBookEventAmount = maxWinShown ? CAP_AMOUNT : clampToCap(bookEvent.amount);
 	},
 	freeSpinTrigger: async (bookEvent: BookEventOfType<'freeSpinTrigger'>) => {
 		await glowWins(bookEvent.positions);
