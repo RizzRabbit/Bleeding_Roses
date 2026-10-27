@@ -11,8 +11,9 @@ type SampleBook = {
 	events: BookEvent[];
 };
 
-// buy-wincap: buy_bleeding simulation 16, book id 17. The 15000x cap lands on free spin 7 of 10.
-// base-wincap stays lookup id 12 in lookUpTable_base.csv (base simulation 11, weight 1, payout 1500000).
+// buy-wincap: buy_bleeding simulation 16 forced onto the wincap criteria. The 15000x cap
+// lands on free spin 7 of 10. Published lookup id 12 is not that book; the optimized
+// table has 10,000 rows and weights the cap across the wincap quota.
 const ORDER: Record<string, string[]> = {
 	base: ['base-win', 'base-best', 'base-bleeding', 'base-moon', 'base-harvest', 'base-zero', 'base-spin', 'buy-wincap'],
 	bloodlust: ['bloodlust-spin', 'bloodlust-bleeding'],
