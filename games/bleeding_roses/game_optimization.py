@@ -1,201 +1,205 @@
-"""Optimization parameters for Bleeding Roses slot game."""
+"""Optimization fences for every Bleeding Roses bet mode.
+
+Fence RTP values are fractions of the mode RTP (they sum to 0.96). `hr` is the
+published "1 in N" rate. For a fence with an explicit hit rate the average
+payout of those books is `hr * rtp * cost`. Wincap uses the 15000x cap directly.
+The `0` fence is the remainder, so its hit rate is left unset.
+"""
 
 from optimization_program.optimization_config import (
-    ConstructScaling,
-    ConstructParameters,
     ConstructConditions,
+    ConstructParameters,
+    ConstructScaling,
     verify_optimization_input,
 )
 
 
-class OptimizationSetup:
-    """
-    Bleeding Roses specific optimization setup.
-    Configures RTP distribution and win balancing for 96% target.
-    """
+Wincap_RTP = 0.01
 
-    def __init__(self, game_config: object):
-        self.game_config = game_config
-        
-        # Configure optimization parameters for Bleeding Roses
-        self.game_config.opt_params = {
-            "base": {
-                "conditions": {
-                    # Max win condition (0.1% of simulations)
-                    "wincap": ConstructConditions(
-                        rtp=0.01,           # 1% of total RTP from max wins
-                        av_win=5000,        # Average win when max win occurs
-                        search_conditions=5000  # Search for 5000x+ wins
-                    ).return_dict(),
-                    
-                    # Zero win condition (30% of simulations)
-                    "0": ConstructConditions(
-                        rtp=0,              # No RTP from losing spins
-                        av_win=0,           # No average win
-                        search_conditions=0 # Zero win condition
-                    ).return_dict(),
-                    
-                    # Free game condition (8% of simulations)
-                    "freegame": ConstructConditions(
-                        rtp=0.35,           # 35% of total RTP from free spins
-                        hr=200,             # Hit rate: 1 in 200 spins trigger free games
-                        search_conditions={"symbol": "RP"}  # Reaper scatter triggers
-                    ).return_dict(),
-                    
-                    # Base game wins condition (62% of simulations)
-                    "basegame": ConstructConditions(
-                        rtp=0.60,           # 60% of total RTP from base game
-                        hr=3.0              # Hit rate: 1 in 3 spins wins
-                    ).return_dict(),
-                },
-                
-                "scaling": ConstructScaling([
-                    # Base game scaling
-                    {
-                        "criteria": "basegame",
-                        "scale_factor": 1.0,
-                        "win_range": (1, 100),      # 1x to 100x wins
-                        "probability": 0.8,         # 80% of base game wins
-                    },
-                    {
-                        "criteria": "basegame", 
-                        "scale_factor": 1.5,
-                        "win_range": (100, 500),    # 100x to 500x wins
-                        "probability": 0.15,        # 15% of base game wins
-                    },
-                    {
-                        "criteria": "basegame",
-                        "scale_factor": 2.0, 
-                        "win_range": (500, 2000),   # 500x to 2000x wins
-                        "probability": 0.05,        # 5% of base game wins
-                    },
-                    
-                    # Free game scaling (higher volatility)
-                    {
-                        "criteria": "freegame",
-                        "scale_factor": 1.0,
-                        "win_range": (1, 200),      # 1x to 200x wins
-                        "probability": 0.6,         # 60% of free spin wins
-                    },
-                    {
-                        "criteria": "freegame",
-                        "scale_factor": 2.0,
-                        "win_range": (200, 1000),   # 200x to 1000x wins
-                        "probability": 0.3,         # 30% of free spin wins
-                    },
-                    {
-                        "criteria": "freegame", 
-                        "scale_factor": 3.0,
-                        "win_range": (1000, 10000), # 1000x to 10000x wins
-                        "probability": 0.1,         # 10% of free spin wins
-                    },
-                ]).return_dict(),
-                
-                "parameters": ConstructParameters(
-                    num_show=5000,          # Number of results to display
-                    num_per_fence=10000,    # Simulations per optimization cycle
-                    min_m2m=4,             # Minimum multiplier-to-multiplier ratio
-                    max_m2m=8,             # Maximum multiplier-to-multiplier ratio
-                    pmb_rtp=1.0,           # Perfect mathematical balance RTP
-                    sim_trials=5000,       # Simulation trials for verification
-                    test_spins=[50, 100, 200],  # Test spin counts
-                    test_weights=[0.3, 0.4, 0.3],  # Weights for test results
-                    score_type="rtp",      # Optimize for RTP accuracy
-                ).return_dict(),
-            },
-        }
+# (hr, rtp) per feature fence. The average win of that fence is `hr * rtp * cost`,
+# set a few percent under the probed natural means (Bleeding ~109x, Blood Moon
+# ~311x, Harvest ~701x) so the optimizer overweights the smaller books.
+# RTP values sum to 0.96 with the wincap and base-game fences.
+#
+# Cap is always 15000x the base bet. Its hit rate is 15000 / wincap_rtp / cost.
+# Hit rates are "1 in N". Each extra Reaper is rarer than the tier below it.
+# Bloodlust is several times more often than base. The 20x ante is more often
+# still, and its Moon and Harvest are boosted more than Bleeding Spins.
+FEATURE_TARGETS = {
+    "base": {
+        "bleeding_spins": (580, 0.18172),
+        "blood_moon": (1856, 0.16252),
+        "reapers_harvest": (5939, 0.11450),
+        "basegame_hr": 4.72,
+        "basegame_rtp": 0.49126,
+    },
+    "bloodlust": {
+        "bleeding_spins": (112, 0.31369),
+        "blood_moon": (358, 0.28085),
+        "reapers_harvest": (1146, 0.19779),
+        "basegame_hr": 4.72,
+        "basegame_rtp": 0.15767,
+    },
+    "super_ante_20": {
+        "bleeding_spins": (19, 0.27737),
+        "blood_moon": (44, 0.34276),
+        "reapers_harvest": (108, 0.31482),
+        "basegame_hr": 4.81,
+        "basegame_rtp": 0.00505,
+        "wincap_rtp": 0.02,
+    },
+}
 
-        # Bleeding Roses specific optimization constraints
-        self.add_bleeding_roses_constraints()
-        
-        # Verify optimization input
-        verify_optimization_input(self.game_config, self.game_config.opt_params)
+# Scale weights inside a fence. Higher values favour that win range. The fence
+# mean stays the target above; this only stops the far tail from carrying it.
+# Ranges are base-bet multiples.
+_TAIL_BIAS = (
+    (1, 20, 6.0),
+    (20, 100, 5.0),
+    (100, 500, 2.5),
+    (500, 2000, 0.45),
+    (2000, 15000, 0.08),
+)
+_ANTE_BIAS = (
+    (1, 20, 3.0),
+    (20, 100, 4.0),
+    (100, 500, 4.0),
+    (500, 2000, 1.4),
+    (2000, 15000, 0.1),
+)
+_BUY_BIAS = {
+    "buy_bleeding": (
+        (1, 20, 4.0),
+        (20, 100, 6.0),
+        (100, 500, 1.6),
+        (500, 2000, 0.25),
+        (2000, 15000, 0.05),
+    ),
+    "buy_blood_moon": (
+        (1, 20, 2.0),
+        (20, 100, 4.0),
+        (100, 500, 5.0),
+        (500, 2000, 0.7),
+        (2000, 15000, 0.08),
+    ),
+    "buy_harvest": (
+        (1, 20, 2.0),
+        (20, 100, 3.0),
+        (100, 500, 5.0),
+        (500, 2000, 2.2),
+        (2000, 15000, 0.12),
+    ),
+}
 
-    def add_bleeding_roses_constraints(self):
-        """Add game-specific optimization constraints."""
-        
-        # Transformation frequency constraints
-        self.game_config.transformation_constraints = {
-            "bleeding_heart_frequency": {
-                "min_per_1000_spins": 50,   # Minimum 50 bleeding hearts per 1000 spins
-                "max_per_1000_spins": 150,  # Maximum 150 bleeding hearts per 1000 spins
-                "target_reel_distribution": {
-                    1: 0.33,  # 33% on reel 2 (0-indexed: reel 1)
-                    2: 0.34,  # 34% on reel 3 (0-indexed: reel 2) 
-                    3: 0.33,  # 33% on reel 4 (0-indexed: reel 3)
+def _parameters():
+    return ConstructParameters(
+        num_show=800,
+        num_per_fence=1600,
+        min_m2m=1,
+        max_m2m=12,
+        pmb_rtp=1.0,
+        sim_trials=800,
+        test_spins=[50, 100, 200],
+        test_weights=[0.3, 0.4, 0.3],
+        score_type="rtp",
+    ).return_dict()
+
+
+def _scaling(criteria_names, bands):
+    rows = []
+    for name in criteria_names:
+        for win_range in bands:
+            lo, hi, scale = win_range
+            rows.append(
+                {
+                    "criteria": name,
+                    "scale_factor": scale,
+                    "win_range": (lo, hi),
+                    "probability": 1.0,
                 }
-            },
-            
-            "rose_transformation_rate": {
-                "min_roses_per_transformation": 1,  # At least 1 rose transformed
-                "max_roses_per_transformation": 4,  # Maximum 4 roses per reel
-                "average_multiplier_benefit": 2.5,  # Average benefit from 3x multiplier
-            },
-            
-            "free_spins_enhancement": {
-                "global_transformation_rate": 0.8,  # 80% of free spins have transformation
-                "average_roses_transformed": 8,     # Average roses per free spin round
-                "max_win_contribution": 0.6,       # 60% of max wins come from free spins
+            )
+    return ConstructScaling(rows).return_dict()
+
+
+def _wincap(rtp):
+    return ConstructConditions(rtp=rtp, av_win=15000, search_conditions=15000).return_dict()
+
+
+def _zero():
+    return ConstructConditions(rtp=0, av_win=0, search_conditions=0).return_dict()
+
+
+def _feature_block(spec, wincap_rtp):
+    """Ordered fences: cap, three tiers, dead spins, base-game wins."""
+    assigned = wincap_rtp
+    conditions = {"wincap": _wincap(wincap_rtp)}
+    for tier in ("reapers_harvest", "blood_moon", "bleeding_spins"):
+        hr, rtp = spec[tier]
+        conditions[tier] = ConstructConditions(
+            rtp=rtp, hr=hr, search_conditions={"tier": tier}
+        ).return_dict()
+        assigned += rtp
+    base_rtp = spec["basegame_rtp"]
+    assigned = round(assigned + base_rtp, 5)
+    if abs(assigned - 0.96) > 1e-9:
+        raise RuntimeError(f"fence RTP sums to {assigned}, not 0.96: {spec}")
+    conditions["0"] = _zero()
+    conditions["basegame"] = ConstructConditions(rtp=base_rtp, hr=spec["basegame_hr"]).return_dict()
+    return conditions
+
+
+def _buy_block(criteria, wincap_rtp=Wincap_RTP):
+    feature_rtp = round(0.96 - wincap_rtp, 5)
+    return {
+        "wincap": _wincap(wincap_rtp),
+        criteria: ConstructConditions(
+            rtp=feature_rtp, hr="x", search_conditions={"tier": criteria}
+        ).return_dict(),
+    }
+
+
+def _full_bleed_block():
+    return {
+        "wincap": _wincap(Wincap_RTP),
+        "0": _zero(),
+        "full_bleed": ConstructConditions(rtp=round(0.96 - Wincap_RTP, 5), hr=1.37).return_dict(),
+    }
+
+
+class OptimizationSetup:
+    """Attach `opt_params` for every bet mode on the config."""
+
+    def __init__(self, game_config):
+        self.game_config = game_config
+        params = _parameters()
+        opt = {}
+        for bet_mode in game_config.bet_modes:
+            name = bet_mode.get_name()
+            if name in FEATURE_TARGETS:
+                spec = FEATURE_TARGETS[name]
+                conditions = _feature_block(spec, spec.get("wincap_rtp", Wincap_RTP))
+                scalable = ["reapers_harvest", "blood_moon", "bleeding_spins", "basegame"]
+                bands = _ANTE_BIAS if name == "super_ante_20" else _TAIL_BIAS
+            elif name == "full_bleed":
+                conditions = _full_bleed_block()
+                scalable = ["full_bleed"]
+                bands = tuple((lo, hi, 1.0) for lo, hi, _scale in _TAIL_BIAS)
+            elif name in _BUY_BIAS:
+                criteria = {
+                    "buy_bleeding": "bleeding_spins",
+                    "buy_blood_moon": "blood_moon",
+                    "buy_harvest": "reapers_harvest",
+                }[name]
+                wincap_rtp = 0.02 if name == "buy_harvest" else Wincap_RTP
+                conditions = _buy_block(criteria, wincap_rtp=wincap_rtp)
+                scalable = [criteria]
+                bands = _BUY_BIAS[name]
+            else:
+                raise RuntimeError(f"no optimization block for mode {name}")
+            opt[name] = {
+                "conditions": conditions,
+                "scaling": _scaling(scalable, bands),
+                "parameters": params,
             }
-        }
-
-        # RTP distribution verification
-        self.game_config.rtp_verification = {
-            "total_target": 96.0,
-            "base_game_contribution": 52.8,    # 55% of 96% = 52.8%
-            "free_spins_contribution": 33.6,   # 35% of 96% = 33.6%
-            "transformation_bonus": 9.6,       # 10% of 96% = 9.6%
-            "tolerance": 0.1,                   # ±0.1% tolerance
-        }
-
-        # Max win verification scenarios
-        self.game_config.max_win_scenarios = [
-            {
-                "scenario": "full_screen_bloody_black_roses",
-                "symbols": ["BBR"] * 20,  # 20 bloody black roses
-                "expected_win": 8000,     # Expected ~8000x
-                "probability": 1e-7,      # Very rare
-            },
-            {
-                "scenario": "free_spins_with_global_transformation", 
-                "description": "Multiple 5-of-a-kind bloody roses in free spins",
-                "expected_win": 6000,     # Expected ~6000x
-                "probability": 1e-6,      # Rare
-            },
-            {
-                "scenario": "multiple_bleeding_hearts_with_roses",
-                "description": "Base game with multiple transformations",
-                "expected_win": 2000,     # Expected ~2000x
-                "probability": 1e-5,      # Uncommon
-            }
-        ]
-
-    def get_optimization_summary(self):
-        """Return summary of optimization parameters."""
-        return {
-            "game_id": self.game_config.game_id,
-            "target_rtp": self.game_config.rtp,
-            "max_win": self.game_config.wincap,
-            "hit_frequency_target": "30% (1 in 3.3 spins)",
-            "free_spins_frequency": "0.5% (1 in 200 spins)",
-            "transformation_mechanic": "Bleeding Heart transforms roses to 3x value",
-            "volatility": "Medium-High",
-            "ways_to_win": self.game_config.get_ways_to_win(),
-        }
-
-    def validate_optimization_results(self, results):
-        """Validate that optimization results meet Bleeding Roses requirements."""
-        validation_checks = {
-            "rtp_accuracy": abs(results.get("actual_rtp", 0) - self.game_config.rtp) <= 0.1,
-            "max_win_achievable": results.get("max_win_found", 0) >= self.game_config.wincap * 0.8,
-            "hit_frequency_acceptable": 0.25 <= results.get("hit_frequency", 0) <= 0.35,
-            "free_spins_frequency": 0.004 <= results.get("free_spins_rate", 0) <= 0.006,
-        }
-        
-        all_passed = all(validation_checks.values())
-        
-        return {
-            "passed": all_passed,
-            "checks": validation_checks,
-            "summary": self.get_optimization_summary()
-        }
+        game_config.opt_params = opt
+        verify_optimization_input(game_config, game_config.opt_params)

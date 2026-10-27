@@ -191,6 +191,45 @@ def get_lut_statistics(
     return MathStats
 
 
+def verify_mode_volatility(lut_file, bet_cost, cvar_limit=700.0):
+    """3-star volatility gate for one optimized lookup table.
+
+    Stake's CVaR line is 700 per unit of stake. `cvar_limit` documents that
+    line. The enforced local gate is 540, because a sister game's local CVaR
+    read about 16% below the number Stake reported. Other limits are Stake's:
+    std/cost <= 60, ETL40 <= 0.9, ETL10k <= 0.8, P(>=5000x) < 1%,
+    P(>=10000x) < 0.5%, RTP <= 96.7%. This run also requires RTP at 96.00%
+    and a reachable 15000x book.
+    """
+    import importlib.util
+
+    module_path = os.path.join(
+        os.path.dirname(__file__), "..", "games", "bleeding_roses", "lut_metrics.py"
+    )
+    spec = importlib.util.spec_from_file_location("bleeding_roses_lut_metrics", module_path)
+    lut_metrics = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lut_metrics)
+    if cvar_limit != lut_metrics.STAKE_CVAR:
+        lut_metrics.STAKE_CVAR = float(cvar_limit)
+    payouts, probs = lut_metrics.load(lut_file)
+    result = lut_metrics.metrics(payouts, probs, float(bet_cost))
+    checks = lut_metrics.star_checks(result)
+    print(
+        f"3-star {os.path.basename(lut_file)}: "
+        f"std/cost={result['std_cost']:.2f} cvar/cost={result['cvar_cost']:.1f} "
+        f"etl40={result['etl40']:.3f} etl10k={result['etl10k']:.3f} "
+        f"p5k={result['p5k']:.6f} p10k={result['p10k']:.6f} "
+        f"rtp={result['rtp']:.4f} {'PASS' if checks['pass'] else 'FAIL'}"
+    )
+    if not checks["pass"]:
+        failed = [name for name, ok in checks.items() if name != "pass" and not ok]
+        raise RuntimeError(
+            f"{lut_file} missed the 3-star volatility limits: {', '.join(failed)} "
+            f"(local CVaR gate {lut_metrics.LOCAL_CVAR}, Stake line {lut_metrics.STAKE_CVAR})"
+        )
+    return result
+
+
 def execute_all_tests(config, excluded_modes=[]):
     """Run all tests for a given game"""
     mode_stats = []
@@ -216,6 +255,7 @@ def execute_all_tests(config, excluded_modes=[]):
             )
             setattr(StatsObject, "name", name)
             mode_stats.append(StatsObject)
+            verify_mode_volatility(lut_file, cost)
 
     fname = f"games/{config.game_id}/library/stats_summary.json"
     write_all_stats(mode_stats, fname)
