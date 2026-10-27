@@ -1,0 +1,171 @@
+{
+ "white_rose": {
+  "melt": {
+   "1": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "white_rose_melt.json"
+    ]
+   },
+   "2": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "white_rose_melt_a@2x.json",
+     "white_rose_melt_b@2x.json"
+    ]
+   }
+  },
+  "idle": {
+   "1": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "white_rose_idle_a.json",
+     "white_rose_idle_b.json"
+    ]
+   },
+   "2": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "white_rose_idle_a@2x.json",
+     "white_rose_idle_b@2x.json",
+     "white_rose_idle_c@2x.json"
+    ]
+   }
+  }
+ },
+ "red_rose": {
+  "melt": {
+   "1": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "red_rose_melt.json"
+    ]
+   },
+   "2": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "red_rose_melt_a@2x.json",
+     "red_rose_melt_b@2x.json"
+    ]
+   }
+  },
+  "idle": {
+   "1": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "red_rose_idle_a.json",
+     "red_rose_idle_b.json"
+    ]
+   },
+   "2": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "red_rose_idle_a@2x.json",
+     "red_rose_idle_b@2x.json",
+     "red_rose_idle_c@2x.json"
+    ]
+   }
+  }
+ },
+ "black_rose": {
+  "melt": {
+   "1": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "black_rose_melt.json"
+    ]
+   },
+   "2": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "black_rose_melt_a@2x.json",
+     "black_rose_melt_b@2x.json"
+    ]
+   }
+  },
+  "idle": {
+   "1": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "black_rose_idle_a.json",
+     "black_rose_idle_b.json"
+    ]
+   },
+   "2": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "black_rose_idle_a@2x.json",
+     "black_rose_idle_b@2x.json",
+     "black_rose_idle_c@2x.json"
+    ]
+   }
+  }
+ },
+ "bleeding_heart": {
+  "melt": {
+   "1": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "bleeding_heart_melt.json"
+    ]
+   },
+   "2": {
+    "frames": 81,
+    "fps": 30,
+    "sheets": [
+     "bleeding_heart_melt_a@2x.json",
+     "bleeding_heart_melt_b@2x.json"
+    ]
+   }
+  },
+  "idle": {
+   "1": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "bleeding_heart_idle_a.json",
+     "bleeding_heart_idle_b.json"
+    ]
+   },
+   "2": {
+    "frames": 180,
+    "fps": 30,
+    "sheets": [
+     "bleeding_heart_idle_a@2x.json",
+     "bleeding_heart_idle_b@2x.json",
+     "bleeding_heart_idle_c@2x.json"
+    ]
+   }
+  },
+  "win": {
+   "1": {
+    "frames": 90,
+    "fps": 30,
+    "sheets": [
+     "bleeding_heart_win.json"
+    ]
+   },
+   "2": {
+    "frames": 90,
+    "fps": 30,
+    "sheets": [
+     "bleeding_heart_win_a@2x.json",
+     "bleeding_heart_win_b@2x.json"
+    ]
+   }
+  }
+ }
+}

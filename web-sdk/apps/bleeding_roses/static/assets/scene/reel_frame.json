@@ -1,0 +1,49 @@
+{
+ "image": "reel_frame.png",
+ "size": {
+  "w": 1182,
+  "h": 1005
+ },
+ "window": {
+  "x": 141,
+  "y": 134,
+  "w": 900,
+  "h": 720
+ },
+ "grid": {
+  "cols": 5,
+  "rows": 4,
+  "cell": 180
+ },
+ "note": "Window is transparent and exactly 5x4 cells of 180px; place cell (c,r) top-left at window.x+c*180, window.y+r*180. Scale frame and cell together. v5/v6: no strip insertion / no mirrored layers; smooth stretch of rose-free side runs + undistorted rose re-stamp.",
+ "mockup_1920": {
+  "cell": 172,
+  "scale": 0.9556,
+  "frame_pos": [
+   395,
+   70
+  ],
+  "window": {
+   "x": 530,
+   "y": 198,
+   "w": 860,
+   "h": 688
+  },
+  "note": "v6 desktop 1920x1080 (v1 layout): logo centred above the frame (logo.png scaled to w=960, centre x=960, y=72); frame scaled by 172/180; cells 172px."
+ },
+ "mockup_portrait_1080": {
+  "cell": 160,
+  "scale": 0.8889,
+  "frame_pos": [
+   14.7,
+   780
+  ],
+  "window": {
+   "x": 140,
+   "y": 899.1,
+   "w": 800,
+   "h": 640
+  },
+  "note": "v6 mobile 1080x1920 portrait: logo w=1020 centred at y=410, plaques side by side at y=610, bottom bar at y~1733."
+ }
+}
