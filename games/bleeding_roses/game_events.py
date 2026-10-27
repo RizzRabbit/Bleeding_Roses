@@ -153,7 +153,9 @@ def freespin_end_event(gamestate, winlevel_key="endFeature"):
     The shared SDK event uses int(freegame_wins * 100), which truncates a float
     that is a hair under the cent. This game does not edit that file.
     """
-    amount = int(round(min(gamestate.win_manager.freegame_wins, gamestate.config.wincap) * 100))
+    # On a capped round the free-game share is whatever is left of the cap after base-game wins.
+    room = max(gamestate.config.wincap - gamestate.win_manager.basegame_wins, 0.0)
+    amount = int(round(min(gamestate.win_manager.freegame_wins, room) * 100))
     event = {
         "index": len(gamestate.book.events),
         "type": EventConstants.FREE_SPIN_END.value,
