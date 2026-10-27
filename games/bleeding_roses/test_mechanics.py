@@ -327,7 +327,9 @@ def _cents(state):
 def test_freespin_end_and_win_without_mult_round():
     """Book units use round(), so a float just under the cent is not truncated."""
     state = _state(criteria="bleeding_spins", freegame=True, tier="bleeding_spins")
+    state.win_manager.basegame_wins = 0
     state.win_manager.freegame_wins = 2329.2
+    state.win_manager.running_bet_win = 2329.2
     state.end_freespin()
     event = state.book.events[-1]
     assert event["type"] == "freeSpinEnd"
@@ -352,6 +354,25 @@ def test_freespin_end_and_win_without_mult_round():
     assert info["wins"][0]["meta"]["winWithoutMult"] == 230
     assert info["wins"][0]["win"] == 230
     assert int(2.3 * 100) == 229
+
+
+def test_capped_bonus_keeps_base_wins_out_of_freespin_end():
+    """A max win that also paid in the base game reports only the free portion."""
+    state = _state(criteria="wincap", freegame=True, tier="bleeding_spins")
+    state.win_manager.basegame_wins = 0.6
+    state.win_manager.freegame_wins = 16000
+    state.win_manager.running_bet_win = 16000.6
+    state.wincap_triggered = True
+    state.end_freespin()
+    event = state.book.events[-1]
+    assert event["type"] == "freeSpinEnd"
+    assert event["amount"] == 1_499_940
+    state.update_final_win()
+    final = int(round(state.book.payout_multiplier * 100))
+    base_cents = int(round(state.book.basegame_wins * 100))
+    assert final == 1_500_000
+    assert base_cents == 60
+    assert event["amount"] == final - base_cents
 
 
 def test_published_sample_seeds_keep_their_payouts():
@@ -411,6 +432,79 @@ def test_symbol_access_round_trip():
     state.set_symbol_at_position(0, 0, "BWR")
     assert state.get_symbol_at_position(0, 0) == "BWR"
     assert state.board[0][0].check_attribute("bled") is False or True
+
+
+def test_published_lookup_rtp_matches_the_math_index():
+    """RTP and max win in the rules file come from the optimized lookup tables."""
+    publish = os.path.join(GAME, "library", "publish_files", "lookUpTable_base_0.csv")
+    if not os.path.exists(publish):
+        return
+    from check_published_rtp import lookup_path, measure
+
+    costs = {
+        "base": 1,
+        "bloodlust": 3,
+        "super_ante_20": 20,
+        "buy_bleeding": 100,
+        "buy_blood_moon": 300,
+        "buy_harvest": 600,
+        "full_bleed": 100,
+    }
+    for name, cost in costs.items():
+        rtp, max_win, count = measure(lookup_path(name), cost)
+        assert count == 10000, (name, count)
+        assert abs(rtp - 0.96) < 1e-8, (name, rtp)
+        assert max_win == 15000, (name, max_win)
+    index = os.path.join(ROOT, "web-sdk", "apps", "bleeding_roses", "static", "assets", "math", "index.json")
+    if os.path.exists(index):
+        import subprocess
+
+        result = subprocess.run([sys.executable, os.path.join(GAME, "check_published_rtp.py"), index], check=False)
+        assert result.returncode == 0
+
+
+def test_every_bonus_book_splits_freespin_end_from_the_base_win():
+    """freeSpinEnd is the free-game portion: finalWin minus base-game cents."""
+    import json
+
+    import zstandard as zstd
+
+    folder = os.path.join(GAME, "library", "publish_files")
+    sample = os.path.join(folder, "books_base.jsonl.zst")
+    if not os.path.exists(sample):
+        return
+    modes = [
+        "base",
+        "bloodlust",
+        "super_ante_20",
+        "buy_bleeding",
+        "buy_blood_moon",
+        "buy_harvest",
+        "full_bleed",
+    ]
+    decoder = zstd.ZstdDecompressor()
+    failures = []
+    for name in modes:
+        path = os.path.join(folder, f"books_{name}.jsonl.zst")
+        with open(path, "rb") as handle:
+            payload = decoder.stream_reader(handle).read().decode()
+        for line in payload.splitlines():
+            if not line.strip():
+                continue
+            book = json.loads(line)
+            events = book["events"]
+            free = next((event for event in events if event["type"] == "freeSpinEnd"), None)
+            if free is None:
+                continue
+            final = next(event["amount"] for event in events if event["type"] == "finalWin")
+            base_cents = int(round(float(book["baseGameWins"]) * 100))
+            if free["amount"] != final - base_cents:
+                failures.append((name, book["id"], free["amount"], final, base_cents))
+                if len(failures) >= 5:
+                    break
+        if len(failures) >= 5:
+            break
+    assert not failures, failures
 
 
 def test_volatility_limits_use_the_local_cvar_gate():
