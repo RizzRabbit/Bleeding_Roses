@@ -12,6 +12,16 @@ import { winLevelMap, type WinLevel } from './winLevelMap';
 
 const pending: Promise<void>[] = [];
 
+/** Book units for 15000x. A round stops presenting once this cap is on screen. */
+const CAP_AMOUNT = 1_500_000;
+let maxWinShown = false;
+
+export const beginRound = () => {
+	maxWinShown = false;
+};
+
+const clampToCap = (amount: number) => (amount > CAP_AMOUNT ? CAP_AMOUNT : amount);
+
 const queueMelt = (reel: number, row: number, to: string) => {
 	const job = animateCell(reel, row, 'melt', to);
 	pending.push(job);
@@ -89,16 +99,29 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 	},
 	winInfo: async (bookEvent: BookEventOfType<'winInfo'>) => {
 		await flushMelts();
+		if (maxWinShown) {
+			// A winInfo after MAX WIN does not add another celebration. The meter stays on the cap.
+			stateBet.winBookEventAmount = CAP_AMOUNT;
+			return;
+		}
+		const lineOverCap = bookEvent.wins.some((win) => win.win > CAP_AMOUNT) || bookEvent.totalWin > CAP_AMOUNT;
+		const room = CAP_AMOUNT - stateBet.winBookEventAmount;
+		const crosses = bookEvent.totalWin > room;
 		const positions = bookEvent.wins.flatMap((win) => win.positions);
 		tone(520, 0.18, 'triangle', 0.03);
 		await glowWins(positions);
+		if (lineOverCap || crosses) stateBet.winBookEventAmount = CAP_AMOUNT;
 	},
 	setWin: async (bookEvent: BookEventOfType<'setWin'>) => {
+		if (maxWinShown) return;
+		const room = CAP_AMOUNT - stateBet.winBookEventAmount;
+		if (bookEvent.amount > room) return;
+		const amount = clampToCap(bookEvent.amount);
 		const level = winLevelMap[(bookEvent.winLevel as WinLevel) || 1];
-		await showWin(bookEvent.amount, bookEvent.winLevel, level?.text ?? 'WIN', 'win');
+		await showWin(amount, bookEvent.winLevel, level?.text ?? 'WIN', 'win');
 	},
 	setTotalWin: async (bookEvent: BookEventOfType<'setTotalWin'>) => {
-		stateBet.winBookEventAmount = bookEvent.amount;
+		stateBet.winBookEventAmount = clampToCap(bookEvent.amount);
 	},
 	finalWin: async (bookEvent: BookEventOfType<'finalWin'>) => {
 		stateBet.winBookEventAmount = bookEvent.amount;
@@ -139,10 +162,11 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 			duration: stateBet.isTurbo ? 500 : 1200,
 		});
 	},
-	freeSpinEnd: async (bookEvent: BookEventOfType<'freeSpinEnd'>, { bookEvents }: BookEventContext) => {
-		const finalWin = bookEvents.find((event) => event.type === 'finalWin') as BookEventOfType<'finalWin'> | undefined;
-		const amount = finalWin?.amount ?? bookEvent.amount;
-		await showWin(amount, bookEvent.winLevel, 'TOTAL WIN', 'total');
+	freeSpinEnd: async (bookEvent: BookEventOfType<'freeSpinEnd'>) => {
+		// Bonus total only. The round total is finalWin, which is what the RGS pays.
+		if (!maxWinShown) {
+			await showWin(bookEvent.amount, bookEvent.winLevel, 'TOTAL WIN', 'total');
+		}
 		clearFeature();
 		stateGame.gameType = 'basegame';
 	},
@@ -187,7 +211,10 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 		stateGame.stickyReels = bookEvent.stickyReels?.slice() ?? [];
 	},
 	wincap: async (bookEvent: BookEventOfType<'wincap'>) => {
-		await showWin(bookEvent.amount, 10, 'MAX WIN', 'total');
+		maxWinShown = true;
+		const amount = clampToCap(bookEvent.amount);
+		stateBet.winBookEventAmount = amount;
+		await showWin(amount, 10, 'MAX WIN', 'total');
 	},
 	createBonusSnapshot: async (bookEvent: BookEventOfType<'createBonusSnapshot'>) => {
 		const find = <T extends BookEvent['type']>(type: T) =>
@@ -204,9 +231,13 @@ export const bookEventHandlerMap: BookEventHandlerMap<BookEvent, BookEventContex
 			stateGame.gameType = 'freegame';
 		}
 		if (update) stateGame.freeSpin = { current: update.amount + 1, total: update.total };
-		if (total) stateBet.winBookEventAmount = total.amount;
+		if (total) stateBet.winBookEventAmount = clampToCap(total.amount);
 		if (global) stateGame.globalMult = global.globalMult;
 		if (sticky) stateGame.stickyReels = sticky.stickyReels.slice();
+		if (bookEvent.bookEvents.some((event) => event.type === 'wincap')) {
+			maxWinShown = true;
+			stateBet.winBookEventAmount = CAP_AMOUNT;
+		}
 	},
 };
 

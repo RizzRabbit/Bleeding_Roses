@@ -1,6 +1,7 @@
 """Per-spin state for Bleeding Roses."""
 
 from game_calculations import quantize_win
+from game_events import freespin_end_event
 from game_executables import GameExecutables
 
 
@@ -30,6 +31,10 @@ class GameStateOverride(GameExecutables):
         self.win_manager.basegame_wins = base
         self.win_manager.freegame_wins = quantize_win(total - base)
         super().update_final_win()
+
+    def end_freespin(self) -> None:
+        """Transmit the freegame total with rounded book units."""
+        freespin_end_event(self)
 
     def check_repeat(self):
         super().check_repeat()

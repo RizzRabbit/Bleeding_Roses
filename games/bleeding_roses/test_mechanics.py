@@ -324,6 +324,67 @@ def _cents(state):
     return int(round(state.book.payout_multiplier * 100))
 
 
+def test_freespin_end_and_win_without_mult_round():
+    """Book units use round(), so a float just under the cent is not truncated."""
+    state = _state(criteria="bleeding_spins", freegame=True, tier="bleeding_spins")
+    state.win_manager.freegame_wins = 2329.2
+    state.end_freespin()
+    event = state.book.events[-1]
+    assert event["type"] == "freeSpinEnd"
+    assert event["amount"] == 232920
+
+    from game_events import win_info_event
+
+    state.win_data = {
+        "totalWin": 2.3,
+        "wins": [
+            {
+                "symbol": "WR",
+                "kind": 3,
+                "win": 2.3,
+                "positions": [{"reel": 0, "row": 0}],
+                "meta": {"ways": 1, "globalMult": 1, "winWithoutMult": 2.3},
+            }
+        ],
+    }
+    win_info_event(state)
+    info = [item for item in state.book.events if item["type"] == "winInfo"][-1]
+    assert info["wins"][0]["meta"]["winWithoutMult"] == 230
+    assert info["wins"][0]["win"] == 230
+    assert int(2.3 * 100) == 229
+
+
+def test_published_sample_seeds_keep_their_payouts():
+    """The dev books are these seeds. Rounding must not move the payout."""
+    moon = _state(mode="buy_blood_moon", criteria="blood_moon")
+    moon.run_spin(11)
+    events = moon.book.events
+    free_end = next(event["amount"] for event in events if event["type"] == "freeSpinEnd")
+    final = next(event["amount"] for event in events if event["type"] == "finalWin")
+    base_cents = int(round(moon.book.basegame_wins * 100))
+    assert int(round(moon.book.payout_multiplier * 100)) == 232920
+    assert free_end == 232920
+    assert free_end == final - base_cents
+
+    cap = _state(mode="buy_bleeding", criteria="wincap")
+    cap.run_spin(16)
+    cap_events = cap.book.events
+    spins = [event for event in cap_events if event["type"] == "updateFreeSpin"]
+    assert len(spins) == 7
+    assert spins[-1]["total"] == 10
+    windex = next(index for index, event in enumerate(cap_events) if event["type"] == "wincap")
+    assert cap_events[windex - 1]["type"] == "winInfo"
+    running = 0
+    for event in cap_events:
+        if event["type"] == "setTotalWin" and event["index"] < cap_events[windex]["index"]:
+            running = event["amount"]
+    assert running < 1_500_000
+    assert running + cap_events[windex - 1]["totalWin"] > 1_500_000
+    assert all(event["type"] != "winInfo" for event in cap_events[windex + 1 :])
+    assert any(event["type"] == "freeSpinEnd" for event in cap_events[windex + 1 :])
+    assert int(round(cap.book.payout_multiplier * 100)) == 1_500_000
+
+
 def test_wincap_is_reachable():
     """Every mode can pay 15000x the base bet, not 15000x its cost."""
     modes = [

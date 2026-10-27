@@ -8,8 +8,10 @@ from game_events import (
     reel_bleed_event,
     sticky_bleed_event,
     sticky_reel_event,
+    win_info_event,
 )
 from src.calculations.ways import Ways
+from src.events.events import set_total_event, set_win_event
 
 
 class GameExecutables(GameCalculations):
@@ -38,7 +40,11 @@ class GameExecutables(GameCalculations):
         if self.win_data["totalWin"] > 0:
             Ways.record_ways_wins(self)
             self.win_manager.update_spinwin(self.win_data["totalWin"])
-        Ways.emit_wayswin_events(self)
+        if self.win_manager.spin_win > 0:
+            win_info_event(self)
+            self.evaluate_wincap()
+            set_win_event(self)
+        set_total_event(self)
 
     def _active_feature(self):
         if self.gametype == self.config.freegame_type and self.bonus_tier:

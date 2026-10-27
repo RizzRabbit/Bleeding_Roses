@@ -1,17 +1,18 @@
 import { stateBet } from 'state-shared';
 import { createPlayBookUtils } from 'utils-book';
 
-import { bookEventHandlerMap } from './bookEventHandlerMap';
+import { beginRound, bookEventHandlerMap } from './bookEventHandlerMap';
 import type { Bet, BookEventOfType } from './typesBookEvent';
 
 export const { playBookEvents } = createPlayBookUtils({ bookEventHandlerMap });
 
 export const playBet = async (bet: Bet) => {
+	beginRound();
 	stateBet.winBookEventAmount = 0;
 	await playBookEvents(bet.state);
 };
 
-const RESUME_TYPES = ['bonusTier', 'freeSpinTrigger', 'updateFreeSpin', 'setTotalWin', 'updateGlobalMult', 'stickyReel'];
+const RESUME_TYPES = ['bonusTier', 'freeSpinTrigger', 'updateFreeSpin', 'setTotalWin', 'updateGlobalMult', 'stickyReel', 'wincap'];
 
 export const convertTorResumableBet = (betToResume: Bet) => {
 	const resumingIndex = Number(betToResume.event);
